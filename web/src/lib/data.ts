@@ -5,12 +5,13 @@ export type Benchmark = {
   after: number;
   temp: string;
   samples: number;
+  accuracy: number;
 };
 
 export const BENCHMARKS: Benchmark[] = [
-  { id: "choice", name: "choice", before: 0.35, after: 0.023, temp: "2.7", samples: 24 },
-  { id: "score", name: "score", before: 0.313, after: 0.057, temp: "2.1", samples: 15 },
-  { id: "noul", name: "noul", before: 0.161, after: 0.158, temp: "1.4", samples: 21 },
+  { id: "choice", name: "choice", before: 0.35, after: 0.023, temp: "2.7", samples: 24, accuracy: 0.58 },
+  { id: "score", name: "score", before: 0.313, after: 0.057, temp: "2.1", samples: 15, accuracy: 0.6 },
+  { id: "noul", name: "noul", before: 0.161, after: 0.158, temp: "1.4", samples: 21, accuracy: 0.71 },
 ];
 
 export const STATS = [

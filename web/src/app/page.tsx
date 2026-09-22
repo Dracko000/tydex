@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import { LiftedLink } from "@/components/motion-link";
 import { Nav } from "@/components/nav";
 import { ScrollProgress } from "@/components/scroll-progress";
 import { Reveal } from "@/components/reveal";
 import { Counter } from "@/components/counters";
 import { Terminal } from "@/components/terminal";
 import { CodeBlock } from "@/components/code-block";
+import { CalibrationCharts } from "@/components/calibration-charts";
 import {
   ArrowRightIcon,
   BoltIcon,
@@ -39,7 +41,6 @@ import {
 } from "@/lib/data";
 
 const YEAR = new Date().getFullYear();
-const ECE_MAX = 0.35;
 
 function Kicker({ children }: { children: ReactNode }) {
   return (
@@ -183,13 +184,15 @@ export default function Home() {
               </Reveal>
               <Reveal delay={220}>
                 <div className="mt-8 flex flex-wrap items-center gap-3">
-                  <a
+                  <LiftedLink
                     href="#install"
-                    className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-xl bg-flame px-5 text-base font-semibold text-white shadow-lg shadow-flame/25 transition-all duration-200 hover:shadow-flame/40"
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-xl bg-flame px-5 text-base font-semibold text-white shadow-lg shadow-flame/25 transition-colors duration-200 hover:shadow-flame/40"
                   >
                     <PackageIcon className="h-5 w-5" />
                     Get started
-                  </a>
+                  </LiftedLink>
                   <a
                     href={LINKS.docs}
                     target="_blank"
@@ -266,36 +269,42 @@ export default function Home() {
         }
       >
         <Hairgrid columns="md:grid-cols-3">
-          <Cell>
-            <BracketsIcon className="h-6 w-6 text-brand" />
-            <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
-              Parsing fragility
-            </h3>
-            <MonoSub>
-              Regex over bullet points to recover a single answer. One reworded prompt
-              and your pipeline breaks silently.
-            </MonoSub>
-          </Cell>
-          <Cell>
-            <GaugeIcon className="h-6 w-6 text-brand" />
-            <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
-              Confidence theater
-            </h3>
-            <MonoSub>
-              &ldquo;I&rsquo;m 99% sure&rdquo; ignores calibration. Unfitted probabilities
-              are not decision inputs — they&rsquo;re noise.
-            </MonoSub>
-          </Cell>
-          <Cell>
-            <BoltIcon className="h-6 w-6 text-brand" />
-            <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
-              Multi-turn tug
-            </h3>
-            <MonoSub>
-              Reasoning loops and tool chains multiply token spend. A single greedy call
-              with a schema is enough for most decisions.
-            </MonoSub>
-          </Cell>
+          <Reveal>
+            <Cell>
+              <BracketsIcon className="h-6 w-6 text-brand" />
+              <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
+                Parsing fragility
+              </h3>
+              <MonoSub>
+                Regex over bullet points to recover a single answer. One reworded prompt
+                and your pipeline breaks silently.
+              </MonoSub>
+            </Cell>
+          </Reveal>
+          <Reveal delay={90}>
+            <Cell>
+              <GaugeIcon className="h-6 w-6 text-brand" />
+              <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
+                Confidence theater
+              </h3>
+              <MonoSub>
+                &ldquo;I&rsquo;m 99% sure&rdquo; ignores calibration. Unfitted probabilities
+                are not decision inputs — they&rsquo;re noise.
+              </MonoSub>
+            </Cell>
+          </Reveal>
+          <Reveal delay={180}>
+            <Cell>
+              <BoltIcon className="h-6 w-6 text-brand" />
+              <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
+                Multi-turn tug
+              </h3>
+              <MonoSub>
+                Reasoning loops and tool chains multiply token spend. A single greedy call
+                with a schema is enough for most decisions.
+              </MonoSub>
+            </Cell>
+          </Reveal>
         </Hairgrid>
 
         <div className="mt-16 grid gap-8 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-line">
@@ -374,19 +383,21 @@ export default function Home() {
               body: "A yes/no binary decision with a true probability — the building block of checks and gates.",
               tags: "p(statement) · binary",
             },
-          ].map((p) => (
-            <Cell key={p.name}>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  {p.icon}
-                  <h3 className="font-mono text-xl font-semibold text-ink">{p.name}</h3>
+          ].map((p, i) => (
+            <Reveal key={p.name} delay={i * 80}>
+              <Cell>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    {p.icon}
+                    <h3 className="font-mono text-xl font-semibold text-ink">{p.name}</h3>
+                  </div>
+                  <span className="font-mono text-2xl font-bold text-ink/10">{p.num}</span>
                 </div>
-                <span className="font-mono text-2xl font-bold text-ink/10">{p.num}</span>
-              </div>
-              <code className="mt-4 block font-mono text-sm text-brand">{p.sig}</code>
-              <MonoSub>{p.body}</MonoSub>
-              <p className="mt-4 font-mono text-xs text-mut">{p.tags}</p>
-            </Cell>
+                <code className="mt-4 block font-mono text-sm text-brand">{p.sig}</code>
+                <MonoSub>{p.body}</MonoSub>
+                <p className="mt-4 font-mono text-xs text-mut">{p.tags}</p>
+              </Cell>
+            </Reveal>
           ))}
         </Hairgrid>
 
@@ -429,45 +440,13 @@ export default function Home() {
           </>
         }
       >
-        <Hairgrid columns="lg:grid-cols-3">
-          {BENCHMARKS.map((b) => (
-            <Cell key={b.id}>
-              <div className="flex items-baseline justify-between">
-                <span className="font-mono text-lg font-semibold text-ink">{b.name}</span>
-                <span className="font-mono text-xs text-mut">T = {b.temp}</span>
-              </div>
-              <div className="mt-8 space-y-4">
-                <div className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 font-mono text-xs text-mut">before</span>
-                  <div className="h-1 flex-1 rounded-full bg-raise">
-                    <div
-                      className="h-full rounded-full bg-mut/40"
-                      style={{ width: `${(b.before / ECE_MAX) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-12 shrink-0 text-right font-mono text-sm text-mut tabular-nums">
-                    {b.before.toFixed(3)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 font-mono text-xs text-brand">after</span>
-                  <div className="h-1 flex-1 rounded-full bg-raise">
-                    <div
-                      className="h-full rounded-full bg-flame"
-                      style={{ width: `${(b.after / ECE_MAX) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-12 shrink-0 text-right font-mono text-sm font-semibold text-brand tabular-nums">
-                    {b.after.toFixed(3)}
-                  </span>
-                </div>
-              </div>
-              <p className="mt-6 font-mono text-xs text-mut">
-                ECE · expected calibration error
-              </p>
-            </Cell>
-          ))}
-        </Hairgrid>
+        <CalibrationCharts />
+        <Reveal delay={80}>
+          <p className="mt-6 font-mono text-xs text-mut">
+            ECE · expected calibration error — temperature fitted per primitive,{" "}
+            {BENCHMARKS.reduce((a, b) => a + b.samples, 0)} labeled tickets
+          </p>
+        </Reveal>
 
         <div className="mt-16 grid gap-8 lg:grid-cols-3 lg:gap-0 lg:divide-x lg:divide-line">
           {[
@@ -544,14 +523,16 @@ export default function Home() {
               title: "Evaluation harness",
               body: "Ladder Test benchmarks the whole stack on 60 labeled tickets and exposes ECE before/after every calibration change.",
             },
-          ].map((f) => (
-            <Cell key={f.title}>
-              <h3 className="flex items-center gap-3 font-mono text-lg font-semibold text-ink">
-                {f.icon}
-                {f.title}
-              </h3>
-              <MonoSub>{f.body}</MonoSub>
-            </Cell>
+          ].map((f, i) => (
+            <Reveal key={f.title} delay={(i % 3) * 80}>
+              <Cell>
+                <h3 className="flex items-center gap-3 font-mono text-lg font-semibold text-ink">
+                  {f.icon}
+                  {f.title}
+                </h3>
+                <MonoSub>{f.body}</MonoSub>
+              </Cell>
+            </Reveal>
           ))}
         </Hairgrid>
 
@@ -666,15 +647,17 @@ export default function Home() {
                   can compute on, escalate, or log.
                 </p>
                 <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-                  <a
+                  <LiftedLink
                     href={LINKS.pypi}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-xl bg-flame px-5 text-base font-semibold text-white shadow-lg shadow-flame/25 transition-all duration-200 hover:shadow-flame/40"
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-xl bg-flame px-5 text-base font-semibold text-white shadow-lg shadow-flame/25 transition-colors duration-200 hover:shadow-flame/40"
                   >
                     <CopyIcon className="h-5 w-5" />
                     pip install tydex
-                  </a>
+                  </LiftedLink>
                   <a
                     href={LINKS.github}
                     target="_blank"

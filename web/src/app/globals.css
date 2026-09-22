@@ -83,17 +83,6 @@ body {
   mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, black 55%, transparent 100%);
 }
 
-.reveal {
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.55s ease, transform 0.55s ease;
-}
-
-.reveal.is-in {
-  opacity: 1;
-  transform: none;
-}
-
 .cursor::after {
   content: "▋";
   margin-left: 2px;
@@ -114,11 +103,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
-  }
-  .reveal {
-    opacity: 1;
-    transform: none;
-    transition: none;
   }
   .cursor::after {
     animation: none;

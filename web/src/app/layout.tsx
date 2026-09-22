@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
+import { MotionConfig } from "framer-motion";
 import "./globals.css";
 
 const plex = IBM_Plex_Sans({
@@ -51,7 +52,7 @@ export default function RootLayout(props: LayoutProps<"/">) {
     >
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-        {props.children}
+        <MotionConfig reducedMotion="user">{props.children}</MotionConfig>
       </body>
     </html>
   );
