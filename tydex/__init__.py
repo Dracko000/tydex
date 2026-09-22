@@ -18,7 +18,17 @@ from .calibration import (
 from .core import ChoiceResult, NoulResult, SchemaError, ScoreResult, Tydex
 from .feedback import LogEntry, Recorder
 from .routing import RequiresHuman, RoutedResult, RoutedTydex, Tier
-from .server import RoutedTydexServer, TydexServer, build_server, run
+
+_SERVER_EXPORTS = {"TydexServer", "RoutedTydexServer", "build_server", "run"}
+
+
+def __getattr__(name):
+    if name in _SERVER_EXPORTS:
+        from . import server
+
+        return getattr(server, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "AnthropicCompatibleBackend",
