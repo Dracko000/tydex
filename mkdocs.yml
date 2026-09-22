@@ -1,6 +1,7 @@
 site_name: tydex
 site_description: Typed decision primitives for LLMs — choice, score, and noul, returned as data with probabilities.
-site_url: https://dracko000.github.io/tydex/
+site_url: https://dracko000.github.io/tydex/docs/
+site_dir: site/docs
 repo_url: https://github.com/Dracko000/tydex
 edit_uri: blob/main/docs/
 

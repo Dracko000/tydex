@@ -16,7 +16,7 @@ Typed decision primitives for LLMs â€” `choice`, `score`, and `noul` (yes/no) â€
 
 tydex is designed as a decision *engine*: consume it via the Python API or the HTTP server. There is no chat UI.
 
-**Documentation:** [dracko000.github.io/tydex](https://dracko000.github.io/tydex/) (API reference, interfaces, calibration & routing, contributing)
+**Documentation:** [dracko000.github.io/tydex/docs](https://dracko000.github.io/tydex/docs/) (API reference, interfaces, calibration & routing, contributing)
 
 ## Why
 

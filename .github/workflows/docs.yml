@@ -24,9 +24,24 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install mkdocs-material
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
-      - run: mkdocs build --strict --site-dir site
+      - run: mkdocs build --strict --site-dir site/docs
+
+      - name: Build Next.js site
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copy Next.js export to Pages root
+        run: |
+          mkdir -p site
+          cp -r web/out/. site/
 
       - uses: actions/upload-pages-artifact@v3
         with:

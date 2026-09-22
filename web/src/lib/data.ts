@@ -90,7 +90,7 @@ run(
 export const LINKS = {
   github: "https://github.com/Dracko000/tydex",
   pypi: "https://pypi.org/project/tydex/",
-  docs: "https://dracko000.github.io/tydex/",
+  docs: "https://dracko000.github.io/tydex/docs/",
   ghcr: "https://github.com/Dracko000/tydex/pkgs/container/tydex",
   releases: "https://github.com/Dracko000/tydex/releases",
   changelog: "https://github.com/Dracko000/tydex/blob/main/CHANGELOG.md",
