@@ -5,6 +5,12 @@
 [![PyPI format](https://img.shields.io/pypi/format/tydex.svg)](https://pypi.org/project/tydex/)
 [![License: MIT](https://img.shields.io/pypi/l/tydex.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://img.shields.io/github/actions/workflow/status/Dracko000/tydex/ci.yml?branch=main&label=CI)](https://github.com/Dracko000/tydex/actions)
+[![GitHub release](https://img.shields.io/github/v/release/Dracko000/tydex)](https://github.com/Dracko000/tydex/releases)
+[![Docs](https://img.shields.io/badge/docs-live-2ea44f)](https://dracko000.github.io/tydex/)
+
+<p align="center">
+  <img src="images/logo.png" alt="tydex" width="96">
+</p>
 
 Typed decision primitives for LLMs — `choice`, `score`, and `noul` (yes/no) — returned as **data with probabilities**, not prose. Built on top of a single model call with greedy decoding, plus calibration, confidence-based escalation, and an iterative re-calibration loop.
 
