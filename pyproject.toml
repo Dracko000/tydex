@@ -4,11 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tydex"
-version = "0.1.2"
+version = "0.1.3"
 description = "Typed decision primitives (choice/score/noul) with probabilities, calibration, and confidence-based escalation."
 requires-python = ">=3.10"
 dependencies = []
 license = "MIT"
+keywords = ["llm", "decision-engine", "calibration", "probability", "choice", "score", "noul", "routing"]
 readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",

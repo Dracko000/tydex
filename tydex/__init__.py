@@ -1,3 +1,4 @@
+from ._version import __version__
 from .autocal import AutoCalibrator
 from .backends import (
     AnthropicCompatibleBackend,
@@ -57,6 +58,7 @@ __all__ = [
     "Tier",
     "Tydex",
     "TydexServer",
+    "__version__",
     "build_server",
     "calibrate_temperature",
     "run",

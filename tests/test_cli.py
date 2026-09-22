@@ -69,6 +69,18 @@ class ResolveBackendTest(unittest.TestCase):
 
 
 class CliIntegrationTest(unittest.TestCase):
+    def test_version_flag(self):
+        from tydex import __version__
+
+        self.assertRegex(__version__, r"^\d+\.\d+\.\d+$")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            with self.assertRaises(SystemExit) as cm:
+                main(["--version"])
+        self.assertEqual(cm.exception.code, 0)
+        self.assertIn("tydex", out.getvalue())
+        self.assertIn(__version__, out.getvalue())
+
     def test_main_mock_choice_human(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):

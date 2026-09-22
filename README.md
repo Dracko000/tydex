@@ -40,7 +40,7 @@ Confidence escalation               tiered routing + human         yes (clone ta
 Feedback / auto-refit               Recorder + AutoCalibrator      internal
 Interfaces                          Python API, HTTP, CLI, bench   limited HTTP/SDK
 Self-hosting & data                 yes, all files on your side    no, data on their servers
-Verification                        89 tests + CI + e2e            not published
+Verification                        91 tests + CI + e2e            not published
 ```
 
 Implementation openness (illustrative, 0–10):
@@ -276,12 +276,20 @@ tydex ask --provider openai_compatible_cloud --base-url https://ollama.com/v1 \
 ## CLI tooling
 
 - `demo.py` — end-to-end walkthrough: mock execution, calibration, escalation, calibration system.
-- `bench.py` — run the labeled dataset (`data/tickets.jsonl`: 40 samples — 16 choice, 14 noul, 10 score) against a real backend and report accuracy + ECE before/after temperature tuning:
+- `bench.py` — run the labeled dataset (`data/tickets.jsonl`: 60 samples — 24 choice, 21 noul, 15 score) against a real backend and report accuracy + ECE before/after temperature tuning:
   ```bash
   python bench.py --model gemma4:31b --base-url https://ollama.com/v1
   python bench.py --model gemma4:31b --base-url https://ollama.com/v1 --reset-recorder
   ```
   Requires an Ollama cloud API key in `OLLAMA_API_KEY` (or `OPENAI_API_KEY`).
+
+  Latest run (`gemma4:31b`, Ollama cloud, 2026-09):
+
+  | primitive | n | accuracy | ECE before | best T | ECE after |
+  |---|---|---|---|---|---|
+  | choice | 24 | 0.58 | 0.350 | 2.7 | 0.023 |
+  | score | 15 | 0.60 | 0.313 | 2.1 | 0.057 |
+  | noul | 21 | 0.71 | 0.161 | 1.4 | 0.158 |
 
 ## Development
 
@@ -291,7 +299,20 @@ python -m ruff check .                   # lint (ruff config in pyproject.toml)
 python -m mypy tydex                     # optional static typing
 ```
 
-CI (`.github/workflows/ci.yml`) runs lint + the full suite on Python 3.10–3.13.
+CI (`.github/workflows/ci.yml`) runs lint + the full suite on Python 3.10–3.13. Release history is kept in [`CHANGELOG.md`](CHANGELOG.md).
+
+## Contributing
+
+1. **Run the checks before pushing** — code is linted with ruff (line length 200, target py310), type-checked with mypy (the `tydex/` package must stay clean), and covered by the unittest suite:
+   ```bash
+   python -m ruff check .
+   python -m mypy tydex
+   python -m unittest discover -s tests
+   ```
+2. **Keep the primitives typed** — `choice`/`score`/`noul` return dataclasses; new backends must speak plain HTTP (no SDKs) and declare `supports_logprobs`.
+3. **No code comments** — tydex is written comment-free by design; explain non-obvious decisions in the commit message.
+4. **Labeled samples** — dataset additions belong in `data/tickets.jsonl` (`primitive`, `state`, `options`/`levels`/`statement`, `answer`); rerun `bench.py` and update the results table.
+5. **Releases** — bump `version` in `pyproject.toml`, add a `CHANGELOG.md` entry, then tag `vX.Y.Z`; CI publishes wheel/sdist to PyPI and the image to GHCR. Sign off by running `python -m build` + `twine check dist/*`.
 
 ## Project layout
 

@@ -7,6 +7,7 @@ import sys
 import time
 from urllib.error import URLError
 
+from ._version import __version__
 from .backends import (
     AnthropicCompatibleBackend,
     MockBackend,
@@ -190,6 +191,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tydex", description="Tydex decision engine CLI: connect to AI providers and run typed primitives.")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_providers = sub.add_parser("providers", help="list AI providers with configured status and default models")
