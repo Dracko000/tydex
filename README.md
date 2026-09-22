@@ -260,8 +260,9 @@ tydex ask --provider openai-compatible --base-url https://ollama.com/v1 \
 ## Development
 
 ```bash
-python -m unittest discover -s tests     # 60+ tests, incl. local HTTP fakes for both API families
+python -m unittest discover -s tests     # 80+ tests, incl. local HTTP fakes for both API families
 python -m ruff check .                   # lint (ruff config in pyproject.toml)
+python -m mypy tydex                     # optional static typing
 ```
 
 CI (`.github/workflows/ci.yml`) runs lint + the full suite on Python 3.10–3.13.

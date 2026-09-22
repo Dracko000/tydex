@@ -8,9 +8,26 @@ version = "0.1.0"
 description = "Typed decision primitives (choice/score/noul) with probabilities, calibration, and confidence-based escalation."
 requires-python = ">=3.10"
 dependencies = []
+license = "MIT"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Repository = "https://github.com/Dracko000/tydex"
 
 [project.optional-dependencies]
-openai = ["openai>=1.40"]
+tests = ["ruff==0.16.*"]
 
 [project.scripts]
 tydex = "tydex.cli:main"
