@@ -249,4 +249,4 @@ class Recorder:
 
 
 def _argmax_label(probs: dict[str, float]) -> str:
-    return max(probs, key=probs.get)
+    return max(probs, key=lambda k: probs[k])

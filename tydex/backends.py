@@ -159,5 +159,5 @@ class MockBackend(Backend):
         self._logprobs = logprobs or {"0": 0.6, "1": 0.3, "2": 0.1, "Yes": 0.7, "No": 0.3}
 
     def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
-        text = max(self._logprobs, key=self._logprobs.get)
+        text = max(self._logprobs, key=lambda k: self._logprobs[k])
         return ModelResponse(text=text, logprobs=dict(self._logprobs))

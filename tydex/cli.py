@@ -115,7 +115,7 @@ def cmd_providers(args: argparse.Namespace) -> int:
     return 0
 
 
-def _csv(flag: str, raw: str | None) -> list[str] | None:
+def _csv(flag: str, raw: str | None) -> list[str]:
     if raw is None:
         raise CliError(f"missing required argument: {flag}")
     items = [item.strip() for item in raw.split(",") if item.strip()]
@@ -127,24 +127,16 @@ def _csv(flag: str, raw: str | None) -> list[str] | None:
 def _run(tdex: Tydex, args: argparse.Namespace, state: object):
     start = time.perf_counter()
     if args.type == "choice":
-        result = tdex.choice(state, _csv("--options", args.options), question=args.question, mode=args.mode, temperature=args.temperature)
-        value = result.choice
-        probs = result.probabilities
-        key = "choice"
-    elif args.type == "score":
-        result = tdex.score(state, _csv("--levels", args.levels), question=args.question, mode=args.mode, temperature=args.temperature)
-        value = result.score
-        probs = result.probabilities
-        key = "score"
-    else:
-        if not args.statement:
-            raise CliError("missing required argument: --statement")
-        result = tdex.noul(state, args.statement, mode=args.mode, temperature=args.temperature)
-        value = result.bool_value
-        probs = {"true": result.probability, "false": round(1.0 - result.probability, 6)}
-        key = "probability"
-    elapsed = time.perf_counter() - start
-    return result, key, value, probs, elapsed
+        res_c = tdex.choice(state, _csv("--options", args.options), question=args.question, mode=args.mode, temperature=args.temperature)
+        return res_c, "choice", res_c.choice, res_c.probabilities, time.perf_counter() - start
+    if args.type == "score":
+        res_s = tdex.score(state, _csv("--levels", args.levels), question=args.question, mode=args.mode, temperature=args.temperature)
+        return res_s, "score", res_s.score, res_s.probabilities, time.perf_counter() - start
+    if not args.statement:
+        raise CliError("missing required argument: --statement")
+    res_n = tdex.noul(state, args.statement, mode=args.mode, temperature=args.temperature)
+    probs = {"true": res_n.probability, "false": round(1.0 - res_n.probability, 6)}
+    return res_n, "probability", res_n.bool_value, probs, time.perf_counter() - start
 
 
 def cmd_ask(args: argparse.Namespace) -> int:

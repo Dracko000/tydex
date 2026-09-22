@@ -27,7 +27,7 @@ classifiers = [
 Repository = "https://github.com/Dracko000/tydex"
 
 [project.optional-dependencies]
-tests = ["ruff==0.16.*"]
+tests = ["ruff==0.16.*", "mypy>=1.10"]
 
 [project.scripts]
 tydex = "tydex.cli:main"

@@ -87,7 +87,7 @@ class IsotonicCalibrator:
     def transform_probs(self, probabilities: dict[str, float]) -> dict[str, float]:
         if not self.xs:
             return probabilities
-        chosen = max(probabilities, key=probabilities.get)
+        chosen = max(probabilities, key=lambda k: probabilities[k])
         p0 = probabilities[chosen]
         p1 = max(0.0, min(1.0, self.transform(p0)))
         denom = max(1e-9, 1.0 - p0)
@@ -136,7 +136,7 @@ class CalibrationSystem:
             if bundle is None:
                 continue
             probs, label = bundle
-            confidence = probs[max(probs, key=probs.get)]
+            confidence = probs[max(probs, key=lambda k: probs[k])]
             correct = entry.correct
             if correct is None:
                 continue
@@ -222,12 +222,12 @@ class CalibratedTydex:
             p = probs["true"]
             return NoulResult(probability=p, confidence=max(p, 1.0 - p), source=f"{result.source}+cal")
         probs = self.system.transform(primitive, result.probabilities)
-        chosen = max(probs, key=probs.get)
+        chosen = max(probs, key=lambda k: probs[k])
         confidence = probs[chosen]
-        kwargs = {"probabilities": probs, "confidence": confidence, "source": f"{result.source}+cal"}
+        source = f"{result.source}+cal"
         if primitive == "choice":
-            return ChoiceResult(choice=chosen, **kwargs)
-        return ScoreResult(score=chosen, **kwargs)
+            return ChoiceResult(choice=chosen, probabilities=probs, confidence=confidence, source=source)
+        return ScoreResult(score=chosen, probabilities=probs, confidence=confidence, source=source)
 
     def choice(self, state, options, *, question="Choose the best option.", temperature=1.0, **kwargs):
         return self._apply("choice", self.tdex.choice(state, options, question=question, temperature=temperature))

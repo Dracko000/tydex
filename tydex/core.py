@@ -108,7 +108,7 @@ def _logprob_choice(backend: Backend, model: str, system: str, user: str, labels
     if lp is None:
         raise SchemaError("backend did not return logprobs")
     index_tokens = [str(i) for i in range(len(labels))]
-    picked = {}
+    picked: dict[str, float] = {}
     for token, prob in lp.items():
         key = token.strip().split()[-1] if token.strip() else token
         if key in index_tokens:
@@ -118,7 +118,7 @@ def _logprob_choice(backend: Backend, model: str, system: str, user: str, labels
     picked = _normalize(picked)
     if temperature != 1.0:
         picked = _rescale(picked, temperature)
-    chosen_key = max(picked, key=picked.get)
+    chosen_key = max(picked, key=lambda k: picked[k])
     return labels[int(chosen_key)], picked
 
 

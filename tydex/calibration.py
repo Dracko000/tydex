@@ -27,7 +27,7 @@ def _metrics(probabilities: list[dict[str, float]], correct: list[str], n_bins: 
     brier_sum = 0.0
     correct_count = 0
     for probs, label in zip(probabilities, correct, strict=True):
-        chosen = max(probs, key=probs.get)
+        chosen = max(probs, key=lambda k: probs[k])
         confidence = probs[chosen]
         ok = chosen == label
         correct_count += int(ok)
