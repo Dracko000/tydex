@@ -244,7 +244,7 @@ docker build -t tydex .
 docker run -p 8000:8000 --env-file .env tydex
 ```
 
-Environment-driven defaults (`--backend auto`): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_HOST` (plus `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `OLLAMA_MODEL`). A `.env` file is loaded automatically (supports both `KEY=value` and `KEY: value`).
+Environment-driven defaults (`--backend auto`): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_HOST` (plus `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `OLLAMA_MODEL`). A `.env` file is loaded automatically (supports both `KEY=value` and `KEY: value`); a filled-in template lives at [`.env.example`](.env.example).
 
 ## CLI
 
