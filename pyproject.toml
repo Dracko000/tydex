@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tydex"
-version = "0.1.1"
+version = "0.1.2"
 description = "Typed decision primitives (choice/score/noul) with probabilities, calibration, and confidence-based escalation."
 requires-python = ">=3.10"
 dependencies = []
