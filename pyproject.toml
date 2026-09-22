@@ -12,6 +12,9 @@ dependencies = []
 [project.optional-dependencies]
 openai = ["openai>=1.40"]
 
+[project.scripts]
+tydex = "tydex.cli:main"
+
 [tool.setuptools.packages.find]
 include = ["tydex*"]
 

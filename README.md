@@ -191,6 +191,21 @@ Endpoints:
 
 Environment-driven defaults (`--backend auto`): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_HOST` (plus `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `OLLAMA_MODEL`). A `.env` file is loaded automatically (supports both `KEY=value` and `KEY: value`).
 
+## CLI
+
+`pip install .` provides a `tydex` command (also runnable as `py -m tydex`). It connects to any AI provider from the shell and runs a single typed decision:
+
+```bash
+tydex providers                      # show providers, endpoints, key vars, configured status
+tydex ask --type noul --statement "A week has seven days"
+tydex ask --provider openai --type choice \
+       --options "refund,replace" --state '{"ticket": "wrong item shipped"}'
+tydex ask --provider openai-compatible --base-url https://ollama.com/v1 \
+       --model gemma4:31b --no-logprobs --type noul --statement "..."
+```
+
+`--provider` defaults to `auto` and picks from the environment (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_API_KEY`, `OLLAMA_HOST`); `--mode self`/`--no-logprobs` force the JSON self-estimate path when the endpoint exposes no token logprobs. Add `--json` for machine-readable output.
+
 ## CLI tooling
 
 - `demo.py` — end-to-end walkthrough: mock execution, calibration, escalation, calibration system.
