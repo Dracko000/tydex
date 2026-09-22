@@ -13,6 +13,47 @@ A decision workflow built on chat completions has to parse free text and guess h
 - **Routing/escalation** — cheap model by default, escalate to a frontier model (or a human) when confidence is too low.
 - **Feedback loop** — label predictions and auto-refit the calibration as samples accumulate.
 
+## tydex vs Jev
+
+tydex is an open-source behavioural clone of **Jev**, the decision engine that inspired it. The primitive semantics (`choice`/`score`/`noul`) are modelled after Jev; the engineering tradeoffs favour openness and self-hosting.
+
+```
+Capability                          tydex                          Jev (original, closed)
+-------------------------------------------------------------------------------------------
+Source code                         open (GitHub)                  proprietary / closed
+Install                             pip install . / py -m tydex     closed SaaS
+Models & providers                  any: OpenAI, Anthropic,        fixed internal vendor set
+                                    Ollama, OpenAI-compat, mock
+No vendor lock-in                   yes                            no
+Probabilities                       raw token logprobs or          internal estimate, not
+                                    self-estimate JSON; auditable  documented
+Calibration                         temperature + isotonic PAV     internal, not open
+                                    + auto temperature, ECE report
+Confidence escalation               tiered routing + human         yes (clone target)
+                                    fallback
+Feedback / auto-refit               Recorder + AutoCalibrator      internal
+Interfaces                          Python API, HTTP, CLI, bench   limited HTTP/SDK
+Self-hosting & data                 yes, all files on your side    no, data on their servers
+Verification                        79 tests + CI + e2e            not published
+```
+
+Implementation openness (illustrative, 0–10):
+
+```
+tydex      ██████████  10  — your code, data, and calibration pipeline
+Jev (orig) ██           2  — black-box SaaS
+```
+
+Primitive behaviour parity vs Jev:
+
+```
+choice  ██████████  100%  (logprobs + self mode, temperature scaling)
+score   ██████████  100%  (ordered levels, per-primitive calibration)
+noul    ██████████  100%  (probability + bool_value)
+```
+
+> The **Jev** column describes the behaviour that tydex *clones* when it applies to primitives or features that are not publicly documented — it is not a claim about Jev's internal implementation.
+
 ## Install
 
 ```bash
