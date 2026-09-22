@@ -246,6 +246,12 @@ Security: with `--api-key` (or env `TYDEX_API_KEY`) every route except `/health`
 ### Run with Docker
 
 ```bash
+docker run --rm -p 8000:8000 --env-file .env ghcr.io/dracko000/tydex:latest
+```
+
+Images are built and published to the GitHub Container Registry by CI on every `v*` tag (`ghcr.io/dracko000/tydex:<tag>` and `:latest`). To build locally instead:
+
+```bash
 docker build -t tydex .
 docker run -p 8000:8000 --env-file .env tydex
 ```
