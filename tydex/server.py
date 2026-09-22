@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,14 +14,109 @@ from .config import load_env
 from .core import SchemaError, Tydex
 from .routing import RequiresHuman, RoutedTydex
 
+PUBLIC_PATHS = {"/health", "/openapi.json"}
+
+
+def _openapi_spec() -> dict[str, Any]:
+    return {
+        "openapi": "3.0.3",
+        "info": {
+            "title": "Tydex",
+            "version": "0.1.0",
+            "description": "Typed decision primitives (choice/score/noul) with probabilities, calibration, and confidence-based escalation.",
+        },
+        "paths": {
+            "/health": {
+                "get": {"summary": "Liveness probe", "responses": {"200": {"description": "OK"}}},
+            },
+            "/openapi.json": {
+                "get": {"summary": "This OpenAPI document", "responses": {"200": {"description": "OK"}}},
+            },
+            "/calibration": {
+                "get": {
+                    "summary": "Current auto-calibration status",
+                    "responses": {"200": {"description": "Calibration status"}, "404": {"description": "no calibration system attached"}},
+                },
+            },
+            "/evaluate": {
+                "post": {
+                    "summary": "Run a batch of typed questions",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["questions"],
+                                    "properties": {
+                                        "state": {},
+                                        "questions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "required": ["id", "type"],
+                                                "properties": {
+                                                    "id": {"type": "string"},
+                                                    "type": {"type": "string", "enum": ["choice", "score", "noul"]},
+                                                    "options": {"type": "array", "items": {"type": "string"}},
+                                                    "levels": {"type": "array", "items": {"type": "string"}},
+                                                    "statement": {"type": "string"},
+                                                    "question": {"type": "string"},
+                                                    "temperature": {"type": "number"},
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "Results and per-question errors"}},
+                },
+            },
+            "/label": {
+                "post": {
+                    "summary": "Attach ground truth to a logged prediction and maybe refit",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "required": ["log_id", "label"], "properties": {"log_id": {"type": "string"}, "label": {"type": "string"}}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "ok"}, "404": {"description": "unknown log_id or no calibration system"}},
+                },
+            },
+            "/refit": {
+                "post": {
+                    "summary": "Force a manual recalibration",
+                    "responses": {"200": {"description": "ok"}, "404": {"description": "no calibration system attached"}},
+                },
+            },
+        },
+        "components": {
+            "securitySchemes": {
+                "bearerAuth": {"type": "http", "scheme": "bearer", "description": "Requires TYDEX_API_KEY. Health and OpenAPI stay public."},
+            }
+        },
+        "security": [{"bearerAuth": []}],
+    }
+
 
 class TydexHttpHandler(BaseHTTPRequestHandler):
     server_version = "TydexServer/0.1"
 
     def do_GET(self) -> None:
         path = self.path.split("?")[0].rstrip("/")
+        if not self._authorized(path):
+            self._json(401, {"error": "unauthorized"})
+            return
         if path == "/health":
             self._json(200, {"status": "ok"})
+            return
+        if path == "/openapi.json":
+            self._json(200, _openapi_spec())
             return
         if path == "/calibration":
             auto = self.server.tydex_server.auto
@@ -33,6 +129,9 @@ class TydexHttpHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?")[0].rstrip("/")
+        if not self._authorized(path):
+            self._json(401, {"error": "unauthorized"})
+            return
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
@@ -82,11 +181,36 @@ class TydexHttpHandler(BaseHTTPRequestHandler):
             return
         self._json(404, {"error": "not found"})
 
+    def do_OPTIONS(self) -> None:
+        self.send_response(200)
+        self.send_header("Allow", "GET, POST, OPTIONS")
+        self._cors_headers()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _cors_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key")
+
+    def _authorized(self, path: str) -> bool:
+        key = getattr(self.server.tydex_server, "api_key", None)
+        if not key or path in PUBLIC_PATHS:
+            return True
+        header = self.headers.get("Authorization", "")
+        if header.startswith("Bearer "):
+            supplied = header[len("Bearer "):].strip()
+        else:
+            supplied = self.headers.get("X-Api-Key") or ""
+        return bool(supplied) and hmac.compare_digest(supplied, key)
+
     def _json(self, status: int, body: dict[str, Any]) -> None:
         data = json.dumps(body, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
+        if getattr(self.server.tydex_server, "cors", False):
+            self._cors_headers()
         self.end_headers()
         self.wfile.write(data)
 
@@ -95,10 +219,12 @@ class TydexHttpHandler(BaseHTTPRequestHandler):
 
 
 class TydexServer:
-    def __init__(self, tdex: Tydex | CalibratedTydex, *, raw: Tydex | None = None, auto: AutoCalibrator | None = None):
+    def __init__(self, tdex: Tydex | CalibratedTydex, *, raw: Tydex | None = None, auto: AutoCalibrator | None = None, api_key: str | None = None, cors: bool = False):
         self.tdex = tdex
         self.raw = raw or tdex
         self.auto = auto
+        self.api_key = api_key
+        self.cors = cors
 
     def evaluate(self, request: dict[str, Any]) -> dict[str, Any]:
         state = request.get("state")
@@ -188,8 +314,10 @@ class TydexServer:
 
 
 class RoutedTydexServer:
-    def __init__(self, routed: RoutedTydex):
+    def __init__(self, routed: RoutedTydex, *, api_key: str | None = None, cors: bool = False):
         self.routed = routed
+        self.api_key = api_key
+        self.cors = cors
 
     def evaluate(self, request: dict[str, Any]) -> dict[str, Any]:
         state = request.get("state")
@@ -280,9 +408,11 @@ def build_server(
     routed: RoutedTydex | None = None,
     calibration: CalibrationSystem | None = None,
     auto: AutoCalibrator | None = None,
+    api_key: str | None = None,
+    cors: bool = False,
 ) -> TydexServer | RoutedTydexServer:
     if routed is not None:
-        return RoutedTydexServer(routed)
+        return RoutedTydexServer(routed, api_key=api_key, cors=cors)
     backend = backend or _default_backend()
     if model == "default":
         model = getattr(backend, "model", "default")
@@ -290,7 +420,7 @@ def build_server(
     tdex: Tydex | CalibratedTydex = raw
     if calibration is not None:
         tdex = calibration.apply_to(raw)
-    return TydexServer(tdex, raw=raw if auto is not None else None, auto=auto)
+    return TydexServer(tdex, raw=raw if auto is not None else None, auto=auto, api_key=api_key, cors=cors)
 
 
 def run(
@@ -301,8 +431,10 @@ def run(
     routed: RoutedTydex | None = None,
     calibration: CalibrationSystem | None = None,
     auto: AutoCalibrator | None = None,
+    api_key: str | None = None,
+    cors: bool = False,
 ) -> None:
-    tydex_server = build_server(backend=backend, model=model, routed=routed, calibration=calibration, auto=auto)
+    tydex_server = build_server(backend=backend, model=model, routed=routed, calibration=calibration, auto=auto, api_key=api_key, cors=cors)
     httpd = ThreadingHTTPServer((host, port), TydexHttpHandler)
     httpd.tydex_server = tydex_server
     print(f"Tydex server on http://{host}:{port}  (POST /evaluate)")
@@ -319,6 +451,8 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--backend", choices=["openai", "anthropic", "ollama", "mock"], default="auto")
     parser.add_argument("--model", default="default")
+    parser.add_argument("--api-key", default=None, help="require a bearer/X-Api-Key header (env: TYDEX_API_KEY)")
+    parser.add_argument("--cors", action="store_true", help="allow cross-origin browser calls")
     args = parser.parse_args()
     load_env()
     backend = None
@@ -330,4 +464,11 @@ if __name__ == "__main__":
         backend = OllamaBackend(model=args.model if args.model != "default" else os.environ.get("OLLAMA_MODEL") or "llama3.1:8b")
     elif args.backend == "mock":
         backend = MockBackend()
-    run(host=args.host, port=args.port, backend=backend, model=args.model)
+    run(
+        host=args.host,
+        port=args.port,
+        backend=backend,
+        model=args.model,
+        api_key=args.api_key or os.environ.get("TYDEX_API_KEY"),
+        cors=args.cors,
+    )

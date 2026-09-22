@@ -59,6 +59,19 @@ class TestBasicServer(HttpBase):
         self.assertEqual(status, 200)
         self.assertEqual(body["status"], "ok")
 
+    def test_openapi(self):
+        status, body = self.get("/openapi.json")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["openapi"], "3.0.3")
+        self.assertIn("/evaluate", body["paths"])
+
+    def test_cors_preflight(self):
+        with urlopen(
+            Request(f"http://127.0.0.1:{self.port}/evaluate", method="OPTIONS", headers={"Origin": "https://example.com"}), timeout=10
+        ) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "*")
+
     def test_evaluate(self):
         status, body = self.post("/evaluate", {"state": {}, "questions": [{"id": "q", "type": "choice", "options": ["a", "b"]}]})
         self.assertEqual(status, 200)
@@ -86,6 +99,67 @@ class TestBasicServer(HttpBase):
     def test_calibration_without_system(self):
         status, _ = self.get("/calibration")
         self.assertEqual(status, 404)
+
+
+class TestAuthServer(HttpBase):
+    def _make_server(self):
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), TydexHttpHandler)
+        httpd.tydex_server = build_server(backend=self.backend, model="mock", api_key="secret-key-123", cors=True)
+        return httpd
+
+    def post(self, path, payload=None, **headers):
+        req = Request(
+            f"http://127.0.0.1:{self.port}{path}",
+            data=json.dumps(payload or {}).encode(),
+            headers={"Content-Type": "application/json", **headers},
+        )
+        try:
+            with urlopen(req, timeout=10) as resp:
+                return resp.status, json.loads(resp.read().decode())
+        except HTTPError as exc:
+            return exc.code, json.loads(exc.read().decode())
+
+    def test_health_stays_public(self):
+        status, _ = self.get("/health")
+        self.assertEqual(status, 200)
+
+    def test_openapi_stays_public(self):
+        status, _ = self.get("/openapi.json")
+        self.assertEqual(status, 200)
+
+    def test_evaluate_denied_without_key(self):
+        status, body = self.post("/evaluate", {"state": {}, "questions": [{"id": "q", "type": "choice", "options": ["a", "b"]}]})
+        self.assertEqual(status, 401)
+        self.assertEqual(body["error"], "unauthorized")
+
+    def test_evaluate_denied_wrong_key(self):
+        status, _ = self.post("/evaluate", {"state": {}, "questions": [{"id": "q", "type": "choice", "options": ["a", "b"]}]}, Authorization="Bearer wrong")
+        self.assertEqual(status, 401)
+
+    def test_evaluate_allowed_bearer(self):
+        status, body = self.post(
+            "/evaluate",
+            {"state": {}, "questions": [{"id": "q", "type": "choice", "options": ["a", "b"]}]},
+            Authorization="Bearer secret-key-123",
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["results"][0]["id"], "q")
+
+    def test_evaluate_allowed_x_api_key(self):
+        status, _ = self.post(
+            "/evaluate",
+            {"state": {}, "questions": [{"id": "q", "type": "choice", "options": ["a", "b"]}]},
+            **{"X-Api-Key": "secret-key-123"},
+        )
+        self.assertEqual(status, 200)
+
+    def test_calibration_protected(self):
+        status, _ = self.get("/calibration")
+        self.assertEqual(status, 401)
+
+    def test_cors_headers_on_401_and_200(self):
+        status, _ = self.get("/calibration")
+        self.assertEqual(status, 401)
 
 
 class TestAutoLoopServer(HttpBase):

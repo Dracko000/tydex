@@ -209,6 +209,8 @@ python -m tydex.server --backend mock --port 8000
 python -m tydex.server --backend anthropic --model claude-3-5-haiku-latest
 python -m tydex.server --backend openai --model gpt-4o-mini
 python -m tydex.server --backend ollama --model llama3.1:8b
+python -m tydex.server --api-key <key>          # require auth (env: TYDEX_API_KEY)
+python -m tydex.server --cors                    # allow cross-origin browser calls
 ```
 
 Endpoints:
@@ -229,6 +231,9 @@ Endpoints:
 - `POST /refit` — force a manual recalibration.
 - `GET /calibration` — current status: pending count, temperatures, per-primitive meta, refit history.
 - `GET /health` — liveness.
+- `GET /openapi.json` — OpenAPI 3.0 spec of the API.
+
+Security: with `--api-key` (or env `TYDEX_API_KEY`) every route except `/health` and `/openapi.json` requires `Authorization: Bearer <key>` or `X-Api-Key: <key>`. `--cors` enables browser preflight (`OPTIONS`) and `Access-Control-Allow-Origin` headers.
 
 Environment-driven defaults (`--backend auto`): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_HOST` (plus `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `OLLAMA_MODEL`). A `.env` file is loaded automatically (supports both `KEY=value` and `KEY: value`).
 
