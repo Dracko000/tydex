@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.venv/
+venv/
+.env
+*.jsonl
+tydex-calibration.json
+dist/
+build/
+*.egg-info/
