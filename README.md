@@ -34,7 +34,7 @@ Confidence escalation               tiered routing + human         yes (clone ta
 Feedback / auto-refit               Recorder + AutoCalibrator      internal
 Interfaces                          Python API, HTTP, CLI, bench   limited HTTP/SDK
 Self-hosting & data                 yes, all files on your side    no, data on their servers
-Verification                        79 tests + CI + e2e            not published
+Verification                        89 tests + CI + e2e            not published
 ```
 
 Implementation openness (illustrative, 0–10):
@@ -255,7 +255,7 @@ tydex ask --provider openai-compatible --base-url https://ollama.com/v1 \
 ## CLI tooling
 
 - `demo.py` — end-to-end walkthrough: mock execution, calibration, escalation, calibration system.
-- `bench.py` — run the labeled dataset (`data/tickets.jsonl`: 27 samples — 12 choice, 10 noul, 5 score) against a real backend and report accuracy + ECE before/after temperature tuning:
+- `bench.py` — run the labeled dataset (`data/tickets.jsonl`: 40 samples — 16 choice, 14 noul, 10 score) against a real backend and report accuracy + ECE before/after temperature tuning:
   ```bash
   python bench.py --model gemma4:31b --base-url https://ollama.com/v1
   python bench.py --model gemma4:31b --base-url https://ollama.com/v1 --reset-recorder
@@ -265,7 +265,7 @@ tydex ask --provider openai-compatible --base-url https://ollama.com/v1 \
 ## Development
 
 ```bash
-python -m unittest discover -s tests     # 80+ tests, incl. local HTTP fakes for both API families
+python -m unittest discover -s tests     # 90+ tests, incl. local HTTP fakes for both API families
 python -m ruff check .                   # lint (ruff config in pyproject.toml)
 python -m mypy tydex                     # optional static typing
 ```

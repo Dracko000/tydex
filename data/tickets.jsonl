@@ -1,0 +1,40 @@
+{"primitive": "choice", "state": {"issue": "wrong item shipped", "plan": "enterprise", "age_days": 1, "customer_tone": "neutral"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "replace"}
+{"primitive": "choice", "state": {"issue": "billing charged twice", "plan": "pro", "age_days": 3, "customer_tone": "angry"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "refund"}
+{"primitive": "choice", "state": {"issue": "missing feature request", "plan": "free", "age_days": 0, "customer_tone": "neutral"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "wait"}
+{"primitive": "choice", "state": {"issue": "account data corruption", "plan": "enterprise", "age_days": 7, "customer_tone": "escalated"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "escalate"}
+{"primitive": "choice", "state": {"issue": "slow loading", "plan": "pro", "age_days": 2, "customer_tone": "neutral"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "wait"}
+{"primitive": "choice", "state": {"issue": "defective hardware", "plan": "free", "age_days": 5, "customer_tone": "angry"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "replace"}
+{"primitive": "choice", "state": {"issue": "security breach suspicion", "plan": "enterprise", "age_days": 0, "customer_tone": "escalated"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "escalate"}
+{"primitive": "choice", "state": {"issue": "zhc subscription auto-renew surprise", "plan": "pro", "age_days": 1, "customer_tone": "neutral"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "wait"}
+{"primitive": "choice", "state": {"issue": "double charge on free plan", "plan": "free", "age_days": 9, "customer_tone": "angry"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "refund"}
+{"primitive": "choice", "state": {"issue": "api outage at customer site", "plan": "enterprise", "age_days": 0, "customer_tone": "escalated"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "escalate"}
+{"primitive": "choice", "state": {"issue": "cosmetic css bug", "plan": "pro", "age_days": 4, "customer_tone": "neutral"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "wait"}
+{"primitive": "choice", "state": {"issue": "severed support contract unnoticed", "plan": "enterprise", "age_days": 14, "customer_tone": "angry"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "refund"}
+{"primitive": "noul", "state": {"issue": "wrong item shipped", "age_days": 1}, "statement": "customer should get a replacement", "answer": true}
+{"primitive": "noul", "state": {"issue": "missing feature request", "age_days": 0}, "statement": "customer should be refunded now", "answer": false}
+{"primitive": "noul", "state": {"issue": "security breach suspicion", "age_days": 0}, "statement": "ticket needs immediate human attention", "answer": true}
+{"primitive": "noul", "state": {"issue": "cosmetic css bug", "age_days": 4}, "statement": "ticket is urgent", "answer": false}
+{"primitive": "noul", "state": {"issue": "billing charged twice", "age_days": 3}, "statement": "customer is due money back", "answer": true}
+{"primitive": "noul", "state": {"issue": "slow loading", "age_days": 2}, "statement": "sla breach is imminent", "answer": false}
+{"primitive": "noul", "state": {"issue": "double charge on free plan", "age_days": 9}, "statement": "charge should be reversed", "answer": true}
+{"primitive": "noul", "state": {"issue": "api outage at customer site", "age_days": 0}, "statement": "on-call engineer should be paged", "answer": true}
+{"primitive": "noul", "state": {"issue": "severed support contract unnoticed", "age_days": 14}, "statement": "no refund is owed", "answer": false}
+{"primitive": "noul", "state": {"issue": "account data corruption", "age_days": 7}, "statement": "escalate to senior team", "answer": true}
+{"primitive": "score", "state": {"issue": "api outage at customer site", "plan": "enterprise", "age_days": 0}, "levels": ["critical", "high", "medium", "low"], "question": "Severity?", "answer": "critical"}
+{"primitive": "score", "state": {"issue": "cosmetic css bug", "plan": "pro", "age_days": 4}, "levels": ["critical", "high", "medium", "low"], "question": "Severity?", "answer": "low"}
+{"primitive": "score", "state": {"issue": "billing charged twice", "plan": "free", "age_days": 3}, "levels": ["critical", "high", "medium", "low"], "question": "Severity?", "answer": "medium"}
+{"primitive": "score", "state": {"issue": "account data corruption", "plan": "enterprise", "age_days": 7}, "levels": ["critical", "high", "medium", "low"], "question": "Severity?", "answer": "high"}
+{"primitive": "score", "state": {"issue": "missing feature request", "plan": "free", "age_days": 0}, "levels": ["critical", "high", "medium", "low"], "question": "Severity?", "answer": "low"}
+{"primitive": "choice", "state": {"issue": "account locked after password reset", "plan": "pro", "age_days": 1, "customer_tone": "neutral"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "wait"}
+{"primitive": "choice", "state": {"issue": "recurring charge not cancelled", "plan": "free", "age_days": 30, "customer_tone": "angry"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "refund"}
+{"primitive": "choice", "state": {"issue": "export regression in shipped feature", "plan": "enterprise", "age_days": 2, "customer_tone": "escalated"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "escalate"}
+{"primitive": "choice", "state": {"issue": "missing invoicing line items", "plan": "pro", "age_days": 5, "customer_tone": "neutral"}, "options": ["refund", "replace", "escalate", "wait"], "question": "Best action?", "answer": "wait"}
+{"primitive": "noul", "state": {"issue": "account locked after password reset", "age_days": 1}, "statement": "support must recreate the account", "answer": false}
+{"primitive": "noul", "state": {"issue": "recurring charge not cancelled", "age_days": 30}, "statement": "subscription should be refunded outside the window", "answer": true}
+{"primitive": "noul", "state": {"issue": "export regression in shipped feature", "age_days": 2}, "statement": "release should be rolled back immediately", "answer": true}
+{"primitive": "noul", "state": {"issue": "missing invoicing line items", "age_days": 5}, "statement": "billing system needs direct intervention", "answer": false}
+{"primitive": "score", "state": {"issue": "recurring charge not cancelled", "plan": "pro", "age_days": 30}, "levels": ["critical", "high", "medium", "low"], "question": "Severity?", "answer": "medium"}
+{"primitive": "score", "state": {"issue": "export regression in shipped feature", "plan": "enterprise", "age_days": 2}, "levels": ["critical", "high", "medium", "low"], "question": "Severity?", "answer": "high"}
+{"primitive": "score", "state": {"issue": "account locked after password reset", "plan": "free", "age_days": 1}, "levels": ["critical", "high", "medium", "low"], "question": "Severity?", "answer": "low"}
+{"primitive": "score", "state": {"issue": "slow loading", "plan": "enterprise", "age_days": 2}, "levels": ["critical", "high", "medium", "low"], "question": "Severity?", "answer": "medium"}
+{"primitive": "score", "state": {"issue": "severed support contract unnoticed", "plan": "enterprise", "age_days": 14}, "levels": ["critical", "high", "medium", "low"], "question": "Severity?", "answer": "high"}
