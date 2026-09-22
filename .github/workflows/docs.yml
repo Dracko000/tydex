@@ -30,6 +30,8 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      - run: pip install mkdocs-material
+
       - run: mkdocs build --strict --site-dir site/docs
 
       - name: Build Next.js site
