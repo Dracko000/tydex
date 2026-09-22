@@ -16,6 +16,8 @@ Typed decision primitives for LLMs â€” `choice`, `score`, and `noul` (yes/no) â€
 
 tydex is designed as a decision *engine*: consume it via the Python API or the HTTP server. There is no chat UI.
 
+**Documentation:** [dracko000.github.io/tydex](https://dracko000.github.io/tydex/) (API reference, interfaces, calibration & routing, contributing)
+
 ## Why
 
 A decision workflow built on chat completions has to parse free text and guess how sure the model is. tydex instead asks the model for a **single typed token**, reads its probability mass directly, and lets you push that raw distribution through:
