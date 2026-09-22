@@ -1,0 +1,17 @@
+.git
+.github
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.venv/
+venv/
+.env
+*.jsonl
+*calibration.json
+dist/
+build/
+*.egg-info/
+data/
+tests/
+bench.py
+demo.py

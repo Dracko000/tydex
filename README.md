@@ -235,6 +235,13 @@ Endpoints:
 
 Security: with `--api-key` (or env `TYDEX_API_KEY`) every route except `/health` and `/openapi.json` requires `Authorization: Bearer <key>` or `X-Api-Key: <key>`. `--cors` enables browser preflight (`OPTIONS`) and `Access-Control-Allow-Origin` headers.
 
+### Run with Docker
+
+```bash
+docker build -t tydex .
+docker run -p 8000:8000 --env-file .env tydex
+```
+
 Environment-driven defaults (`--backend auto`): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_HOST` (plus `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `OLLAMA_MODEL`). A `.env` file is loaded automatically (supports both `KEY=value` and `KEY: value`).
 
 ## CLI
