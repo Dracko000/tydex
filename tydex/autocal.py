@@ -78,7 +78,15 @@ class AutoCalibrator:
                     due_by_time = (datetime.now(timezone.utc) - last).total_seconds() >= self.refit_every_seconds
                 except ValueError:
                     due_by_time = False
-            if not (due_by_count or due_by_time):
+
+            # Drift detection
+            drift_detected = False
+            for prim in ("choice", "score", "noul"):
+                if self.recorder.monitor_drift(prim):
+                    drift_detected = True
+                    break
+
+            if not (due_by_count or due_by_time or drift_detected):
                 return False
             self._refit()
             return True

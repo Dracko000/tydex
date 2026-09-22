@@ -2,23 +2,41 @@ from __future__ import annotations
 
 import json
 import math
-import urllib.request
+import asyncio
+import httpx
 from dataclasses import dataclass
-from typing import Any
-
+from typing import Any, Callable
 
 @dataclass
 class ModelResponse:
     text: str
     logprobs: dict[str, float] | None = None
 
+async def _with_retry(func: Callable, *args, **kwargs):
+    max_retries = 3
+    backoff = 1.0
+    for i in range(max_retries):
+        try:
+            return await func(*args, **kwargs)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code >= 500 and i < max_retries - 1:
+                await asyncio.sleep(backoff)
+                backoff *= 2
+                continue
+            raise
+        except (httpx.RequestError, asyncio.TimeoutError) as e:
+            if i < max_retries - 1:
+                await asyncio.sleep(backoff)
+                backoff *= 2
+                continue
+            raise
+    raise RuntimeError("Max retries exceeded")
 
 class Backend:
     supports_logprobs = False
 
-    def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
+    async def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
         raise NotImplementedError
-
 
 class OpenAICompatibleBackend(Backend):
     supports_logprobs = True
@@ -29,7 +47,7 @@ class OpenAICompatibleBackend(Backend):
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
         self.supports_logprobs = supports_logprobs
 
-    def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
+    async def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -44,13 +62,14 @@ class OpenAICompatibleBackend(Backend):
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        req = urllib.request.Request(
-            f"{self.base_url}/chat/completions",
-            data=json.dumps(payload).encode(),
-            headers=headers,
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read().decode())
+
+        async def do_req():
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
+                resp.raise_for_status()
+                return resp.json()
+
+        data = await _with_retry(do_req)
         choice = data["choices"][0]
         text = (choice.get("message") or {}).get("content") or ""
         lp = None
@@ -64,13 +83,11 @@ class OpenAICompatibleBackend(Backend):
                 lp[token] = math.exp(item.get("logprob") or 0.0)
         return ModelResponse(text=text, logprobs=lp)
 
-
 class OpenAIBackend(OpenAICompatibleBackend):
     supports_logprobs = True
 
     def __init__(self, model: str = "gpt-4o-mini", api_key: str | None = None, base_url: str | None = None):
         super().__init__(model=model, api_key=api_key, base_url=base_url, supports_logprobs=True)
-
 
 class OllamaBackend(Backend):
     supports_logprobs = False
@@ -80,7 +97,7 @@ class OllamaBackend(Backend):
         self.base_url = base_url.rstrip("/")
         self.num_ctx = num_ctx
 
-    def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
+    async def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -91,20 +108,19 @@ class OllamaBackend(Backend):
             payload["options"]["num_ctx"] = self.num_ctx
         if json_mode:
             payload["format"] = "json"
-        req = urllib.request.Request(
-            f"{self.base_url}/api/chat",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read().decode())
-        return ModelResponse(text=data["message"]["content"] or "")
 
+        async def do_req():
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(f"{self.base_url}/api/chat", json=payload, headers={"Content-Type": "application/json"})
+                resp.raise_for_status()
+                return resp.json()
+
+        data = await _with_retry(do_req)
+        return ModelResponse(text=data["message"]["content"] or "")
 
 class LocalOpenAIBackend(OpenAICompatibleBackend):
     def __init__(self, model: str, base_url: str, api_key: str = "not-needed", supports_logprobs: bool = True):
         super().__init__(model=model, base_url=base_url, api_key=api_key, supports_logprobs=supports_logprobs)
-
 
 class AnthropicCompatibleBackend(Backend):
     supports_logprobs = False
@@ -115,7 +131,7 @@ class AnthropicCompatibleBackend(Backend):
         self.base_url = base_url.rstrip("/")
         self.anthropic_version = anthropic_version
 
-    def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
+    async def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
         system_parts: list[str] = []
         convo: list[dict[str, str]] = []
         for msg in messages:
@@ -138,19 +154,19 @@ class AnthropicCompatibleBackend(Backend):
         }
         if self.api_key:
             headers["x-api-key"] = self.api_key
-        req = urllib.request.Request(
-            f"{self.base_url}/v1/messages",
-            data=json.dumps(payload).encode(),
-            headers=headers,
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read().decode())
+
+        async def do_req():
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(f"{self.base_url}/v1/messages", json=payload, headers=headers)
+                resp.raise_for_status()
+                return resp.json()
+
+        data = await _with_retry(do_req)
         text = ""
         for block in data.get("content") or []:
             if block.get("type") == "text":
                 text += block.get("text") or ""
         return ModelResponse(text=text)
-
 
 class MockBackend(Backend):
     supports_logprobs = True
@@ -158,6 +174,6 @@ class MockBackend(Backend):
     def __init__(self, logprobs: dict[str, float] | None = None):
         self._logprobs = logprobs or {"0": 0.6, "1": 0.3, "2": 0.1, "Yes": 0.7, "No": 0.3}
 
-    def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
+    async def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False) -> ModelResponse:
         text = max(self._logprobs, key=lambda k: self._logprobs[k])
         return ModelResponse(text=text, logprobs=dict(self._logprobs))

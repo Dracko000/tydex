@@ -5,6 +5,8 @@ import os
 import tempfile
 import threading
 import uuid
+import math
+import sqlite3
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -55,11 +57,39 @@ class LogEntry:
 
 
 class Recorder:
-    def __init__(self, path: str = "tydex-feedback.jsonl"):
+    def __init__(self, path: str = "tydex-feedback.db"):
         self.path = path
         self._lock = threading.RLock()
-        self._entries: list[LogEntry] = []
-        self.load()
+        self._init_db()
+
+    def _init_db(self) -> None:
+        with self._lock:
+            with sqlite3.connect(self.path) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS logs (
+                        id TEXT PRIMARY KEY,
+                        ts TEXT,
+                        primitive TEXT,
+                        state TEXT,
+                        question TEXT,
+                        options TEXT,
+                        levels TEXT,
+                        statement TEXT,
+                        temperature REAL,
+                        choice TEXT,
+                        score TEXT,
+                        probability REAL,
+                        probabilities TEXT,
+                        confidence REAL,
+                        source TEXT,
+                        tier TEXT,
+                        escalations TEXT,
+                        cost REAL,
+                        label TEXT
+                    )
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_prim_label ON logs(primitive, label)")
+                conn.commit()
 
     def _make(self, primitive: str, state: Any, **extra: Any) -> LogEntry:
         entry = LogEntry(
@@ -70,9 +100,24 @@ class Recorder:
             **extra,
         )
         with self._lock:
-            self._entries.append(entry)
-            self.save()
+            self.save_entry(entry)
         return entry
+
+    def save_entry(self, entry: LogEntry) -> None:
+        # This replaces the old self.save() which wrote the whole list
+        with self._lock:
+            with sqlite3.connect(self.path) as conn:
+                conn.execute("""
+                    INSERT INTO logs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    entry.id, entry.ts, entry.primitive, json.dumps(entry.state),
+                    entry.question, json.dumps(entry.options), json.dumps(entry.levels),
+                    entry.statement, entry.temperature, entry.choice, entry.score,
+                    entry.probability, json.dumps(entry.probabilities), entry.confidence,
+                    entry.source, entry.tier, json.dumps(entry.escalations),
+                    entry.cost, entry.label
+                ))
+                conn.commit()
 
     def choice(
         self,
@@ -154,43 +199,81 @@ class Recorder:
 
     def label(self, entry_id: str, label: str) -> None:
         with self._lock:
-            for entry in self._entries:
-                if entry.id == entry_id:
-                    entry.label = label
-                    self.save()
-                    return
-        raise KeyError(f"no entry with id {entry_id}")
+            with sqlite3.connect(self.path) as conn:
+                cur = conn.execute("UPDATE logs SET label = ? WHERE id = ?", (label, entry_id))
+                if cur.rowcount == 0:
+                    raise KeyError(f"no entry with id {entry_id}")
+                conn.commit()
 
     def labeled(self) -> list[LogEntry]:
         with self._lock:
-            return [e for e in self._entries if e.label is not None]
+            with sqlite3.connect(self.path) as conn:
+                cur = conn.execute("SELECT * FROM logs WHERE label IS NOT NULL")
+                return [self._row_to_entry(row) for row in cur.fetchall()]
+
+    def _row_to_entry(self, row: tuple) -> LogEntry:
+        return LogEntry(
+            id=row[0], ts=row[1], primitive=row[2], state=json.loads(row[3]),
+            question=row[4], options=json.loads(row[5]) if row[5] else None,
+            levels=json.loads(row[6]) if row[6] else None, statement=row[7],
+            temperature=row[8], choice=row[9], score=row[10],
+            probability=row[11], probabilities=json.loads(row[12]) if row[12] else None,
+            confidence=row[13], source=row[14], tier=row[15],
+            escalations=json.loads(row[16]) if row[16] else [],
+            cost=row[17], label=row[18]
+        )
 
     def save(self) -> None:
-        with self._lock:
-            directory = os.path.dirname(self.path) or "."
-            os.makedirs(directory, exist_ok=True)
-            with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=directory, delete=False) as fh:
-                for entry in self._entries:
-                    fh.write(json.dumps(asdict(entry), ensure_ascii=False) + "\n")
-                tmp = fh.name
-            os.replace(tmp, self.path)
+        pass
 
     def load(self) -> None:
-        with self._lock:
-            try:
-                with open(self.path, encoding="utf-8") as fh:
-                    self._entries = [LogEntry(**json.loads(line)) for line in fh if line.strip()]
-            except FileNotFoundError:
-                self._entries = []
+        pass
 
     def reset(self, *, keep_file: bool = False) -> None:
         with self._lock:
-            self._entries = []
             if not keep_file:
                 try:
                     os.remove(self.path)
+                    self._init_db()
                 except FileNotFoundError:
                     pass
+
+    def monitor_drift(self, primitive: str, window_size: int = 100) -> bool:
+        with self._lock:
+            entries = [e for e in self._entries if e.primitive == primitive]
+            if len(entries) < window_size * 2:
+                return False
+
+            recent = entries[-window_size:]
+            baseline = entries[:window_size]
+
+            def get_conf(e):
+                return e.confidence if e.confidence is not None else 0.0
+
+            mean_recent = sum(get_conf(e) for e in recent) / window_size
+            mean_base = sum(get_conf(e) for e in baseline) / window_size
+
+            # Simple shift detection: > 15% relative difference
+            return abs(mean_recent - mean_base) > 0.15
+
+    def suggest_labels(self, primitive: str, n: int = 10) -> list[str]:
+        with self._lock:
+            unlabeled = [e for e in self._entries if e.primitive == primitive and e.label is None]
+            if not unlabeled:
+                return []
+
+            def score_uncertainty(e):
+                if primitive == "noul":
+                    return abs((e.probability or 0.5) - 0.5)
+                if e.probabilities:
+                    sorted_probs = sorted(e.probabilities.values(), reverse=True)
+                    if len(sorted_probs) < 2:
+                        return 0.0
+                    return sorted_probs[0] - sorted_probs[1]
+                return 1.0
+
+            unlabeled.sort(key=score_uncertainty)
+            return [e.id for e in unlabeled[:n]]
 
     def _calibration_bundle(self, primitive: str) -> tuple[list[dict[str, float]], list[str]]:
         probs: list[dict[str, float]] = []
@@ -250,3 +333,39 @@ class Recorder:
 
 def _argmax_label(probs: dict[str, float]) -> str:
     return max(probs, key=lambda k: probs[k])
+
+def get_model_accuracy(recorder: Recorder, model_name: str, primitive: str | None = None) -> float:
+    with recorder._lock:
+        with sqlite3.connect(recorder.path) as conn:
+            query = "SELECT label, choice, score, probability FROM logs WHERE source = ? AND label IS NOT NULL"
+            params = [model_name]
+            if primitive:
+                query += " AND primitive = ?"
+                params.append(primitive)
+
+            rows = conn.execute(query, params).fetchall()
+            if not rows:
+                return 0.0
+
+            correct = 0
+            for row in rows:
+                label, choice, score, prob = row
+                pred = choice or score or (str(prob == 1.0) if prob is not None else None)
+                if str(pred) == str(label):
+                    correct += 1
+
+            return correct / len(rows)
+
+class WeightTuner:
+    def __init__(self, recorder: Recorder):
+        self.recorder = recorder
+
+    def get_weights(self, models: Sequence[Tydex]) -> list[float]:
+        weights = []
+        for m in models:
+            name = getattr(m, "model", "unknown")
+            acc = get_model_accuracy(self.recorder, name)
+            weights.append(max(0.1, acc))
+
+        total = sum(weights)
+        return [w / total for w in weights]

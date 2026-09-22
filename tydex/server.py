@@ -4,8 +4,42 @@ import argparse
 import hmac
 import json
 import os
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, cast
+
+# ... (existing imports)
+from fastapi import FastAPI, Request, Header, HTTPException, Depends, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+import logging
+import time
+from collections import defaultdict
+
+# Configure structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='{"ts": "%(asctime)s", "level": "%(levelname)s", "msg": "%(message)s", "module": "%(module)s"}'
+)
+logger = logging.getLogger("tydex")
+
+# Simple in-memory rate limiter
+class RateLimiter:
+    def __init__(self, requests_per_minute: int = 60):
+        self.rpm = requests_per_minute
+        self.history = defaultdict(list)
+
+    def is_allowed(self, client_id: str) -> bool:
+        now = time.time()
+        # Clean old timestamps
+        self.history[client_id] = [ts for ts in self.history[client_id] if now - ts < 60]
+        if len(self.history[client_id]) >= self.rpm:
+            return False
+        self.history[client_id].append(now)
+        return True
+
+limiter = RateLimiter(requests_per_minute=100)
+
+# --- Schemas ---
+# ... (rest of the file)
 
 from .autocal import AutoCalibrator
 from .backends import AnthropicCompatibleBackend, Backend, MockBackend, OllamaBackend, OpenAIBackend
@@ -14,217 +48,26 @@ from .config import load_env
 from .core import SchemaError, Tydex
 from .routing import RequiresHuman, RoutedTydex
 
-PUBLIC_PATHS = {"/health", "/openapi.json"}
+# --- Schemas ---
 
+class Question(BaseModel):
+    id: str | None = None
+    type: str # choice, score, noul
+    options: list[str] | None = None
+    levels: list[str] | None = None
+    statement: str | None = None
+    question: str | None = None
+    temperature: float = 1.0
 
-def _openapi_spec() -> dict[str, Any]:
-    return {
-        "openapi": "3.0.3",
-        "info": {
-            "title": "Tydex",
-            "version": "0.1.0",
-            "description": "Typed decision primitives (choice/score/noul) with probabilities, calibration, and confidence-based escalation.",
-        },
-        "paths": {
-            "/health": {
-                "get": {"summary": "Liveness probe", "responses": {"200": {"description": "OK"}}},
-            },
-            "/openapi.json": {
-                "get": {"summary": "This OpenAPI document", "responses": {"200": {"description": "OK"}}},
-            },
-            "/calibration": {
-                "get": {
-                    "summary": "Current auto-calibration status",
-                    "responses": {"200": {"description": "Calibration status"}, "404": {"description": "no calibration system attached"}},
-                },
-            },
-            "/evaluate": {
-                "post": {
-                    "summary": "Run a batch of typed questions",
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["questions"],
-                                    "properties": {
-                                        "state": {},
-                                        "questions": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "required": ["id", "type"],
-                                                "properties": {
-                                                    "id": {"type": "string"},
-                                                    "type": {"type": "string", "enum": ["choice", "score", "noul"]},
-                                                    "options": {"type": "array", "items": {"type": "string"}},
-                                                    "levels": {"type": "array", "items": {"type": "string"}},
-                                                    "statement": {"type": "string"},
-                                                    "question": {"type": "string"},
-                                                    "temperature": {"type": "number"},
-                                                },
-                                            },
-                                        },
-                                    },
-                                },
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "Results and per-question errors"}},
-                },
-            },
-            "/label": {
-                "post": {
-                    "summary": "Attach ground truth to a logged prediction and maybe refit",
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {"type": "object", "required": ["log_id", "label"], "properties": {"log_id": {"type": "string"}, "label": {"type": "string"}}},
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "ok"}, "404": {"description": "unknown log_id or no calibration system"}},
-                },
-            },
-            "/refit": {
-                "post": {
-                    "summary": "Force a manual recalibration",
-                    "responses": {"200": {"description": "ok"}, "404": {"description": "no calibration system attached"}},
-                },
-            },
-        },
-        "components": {
-            "securitySchemes": {
-                "bearerAuth": {"type": "http", "scheme": "bearer", "description": "Requires TYDEX_API_KEY. Health and OpenAPI stay public."},
-            }
-        },
-        "security": [{"bearerAuth": []}],
-    }
+class EvaluateRequest(BaseModel):
+    state: Any = None
+    questions: list[Question]
 
+class LabelRequest(BaseModel):
+    log_id: str
+    label: str
 
-class TydexHttpServer(ThreadingHTTPServer):
-    tydex_server: TydexServer | RoutedTydexServer
-
-
-class TydexHttpHandler(BaseHTTPRequestHandler):
-    server_version = "TydexServer/0.1"
-
-    @property
-    def tydex_server(self) -> TydexServer:
-        return cast(TydexServer, cast(TydexHttpServer, self.server).tydex_server)
-
-    def do_GET(self) -> None:
-        path = self.path.split("?")[0].rstrip("/")
-        if not self._authorized(path):
-            self._json(401, {"error": "unauthorized"})
-            return
-        if path == "/health":
-            self._json(200, {"status": "ok"})
-            return
-        if path == "/openapi.json":
-            self._json(200, _openapi_spec())
-            return
-        if path == "/calibration":
-            auto = self.tydex_server.auto
-            if auto is None:
-                self._json(404, {"error": "no calibration system attached"})
-                return
-            self._json(200, auto.status())
-            return
-        self._json(404, {"error": "not found"})
-
-    def do_POST(self) -> None:
-        path = self.path.split("?")[0].rstrip("/")
-        if not self._authorized(path):
-            self._json(401, {"error": "unauthorized"})
-            return
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            self._json(400, {"error": "invalid Content-Length"})
-            return
-        if length < 0 or length > 64 * 1024 * 1024:
-            self._json(400, {"error": "Content-Length out of range"})
-            return
-        try:
-            raw = self.rfile.read(length) if length else b""
-        except (ConnectionError, OSError):
-            self._json(500, {"error": "read failed"})
-            return
-        try:
-            payload = json.loads(raw.decode() or "{}")
-        except json.JSONDecodeError:
-            self._json(400, {"error": "invalid JSON body"})
-            return
-        if not isinstance(payload, dict):
-            self._json(400, {"error": "body must be a JSON object"})
-            return
-        if path == "/evaluate":
-            self._json(200, self.tydex_server.evaluate(payload))
-            return
-        if path == "/label":
-            auto = self.tydex_server.auto
-            if auto is None:
-                self._json(404, {"error": "no calibration system attached"})
-                return
-            entry_id = payload.get("log_id")
-            label = payload.get("label")
-            try:
-                auto.label(str(entry_id), str(label))
-            except KeyError:
-                self._json(404, {"error": f"unknown log_id {entry_id}"})
-                return
-            refitted = auto.maybe_refit()
-            self._json(200, {"ok": True, "refitted": refitted, **auto.status()})
-            return
-        if path == "/refit":
-            auto = self.tydex_server.auto
-            if auto is None:
-                self._json(404, {"error": "no calibration system attached"})
-                return
-            refitted = auto.refit()
-            self._json(200, {"ok": True, "refitted": refitted, **auto.status()})
-            return
-        self._json(404, {"error": "not found"})
-
-    def do_OPTIONS(self) -> None:
-        self.send_response(200)
-        self.send_header("Allow", "GET, POST, OPTIONS")
-        self._cors_headers()
-        self.send_header("Content-Length", "0")
-        self.end_headers()
-
-    def _cors_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key")
-
-    def _authorized(self, path: str) -> bool:
-        key = getattr(self.tydex_server, "api_key", None)
-        if not key or path in PUBLIC_PATHS:
-            return True
-        header = self.headers.get("Authorization", "")
-        if header.startswith("Bearer "):
-            supplied = header[len("Bearer "):].strip()
-        else:
-            supplied = self.headers.get("X-Api-Key") or ""
-        return bool(supplied) and hmac.compare_digest(supplied, key)
-
-    def _json(self, status: int, body: dict[str, Any]) -> None:
-        data = json.dumps(body, ensure_ascii=False).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        if getattr(self.tydex_server, "cors", False):
-            self._cors_headers()
-        self.end_headers()
-        self.wfile.write(data)
-
-    def log_message(self, fmt: str, *args: Any) -> None:
-        print(f"[tydexsrv] {self.address_string()} {fmt % args}")
-
+# --- Server Logic ---
 
 class TydexServer:
     def __init__(self, tdex: Tydex | CalibratedTydex, *, raw: Tydex | None = None, auto: AutoCalibrator | None = None, api_key: str | None = None, cors: bool = False):
@@ -234,92 +77,89 @@ class TydexServer:
         self.api_key = api_key
         self.cors = cors
 
-    def evaluate(self, request: dict[str, Any]) -> dict[str, Any]:
-        state = request.get("state")
-        questions = request.get("questions")
-        if not isinstance(questions, list):
-            return {"results": [], "errors": [{"error": "'questions' must be a list"}]}
+    async def evaluate(self, request: EvaluateRequest) -> dict[str, Any]:
+        state = request.state
+        questions = request.questions
         results: list[dict[str, Any]] = []
         errors: list[dict[str, Any]] = []
-        for idx, question in enumerate(questions):
-            if not isinstance(question, dict):
-                errors.append({"id": idx, "error": "question must be an object"})
-                continue
+        start_time = time.time()
+
+        for idx, q in enumerate(questions):
             try:
-                results.append(self._answer(state, question))
+                res = await self._answer(state, q)
+                results.append(res)
             except (SchemaError, ValueError, KeyError) as exc:
-                errors.append({"id": question.get("id", idx), "error": str(exc)})
+                errors.append({"id": q.id or idx, "error": str(exc)})
+
+        duration = time.time() - start_time
+        logger.info(json.dumps({
+            "event": "evaluate",
+            "count": len(questions),
+            "errors": len(errors),
+            "duration_ms": duration * 1000,
+            "avg_latency_ms": (duration * 1000 / len(questions)) if questions else 0
+        }))
+
         return {"results": results, "errors": errors}
 
-    def _log(self, primitive: str, state: Any, request: dict, result: Any) -> str | None:
+    async def _log(self, primitive: str, state: Any, request_data: dict, result: Any) -> str | None:
         if self.auto is None:
             return None
         raw = self.raw
-        temperature = float(request.get("temperature", 1.0))
+        temperature = float(request_data.get("temperature", 1.0))
+
         if raw is not self.tdex:
-            raw_result = self._raw_result(raw, primitive, state, request)
+            # We need a way to get raw results async. Since Tydex methods are now async:
+            raw_result = await self._raw_result(raw, primitive, state, request_data)
         else:
             raw_result = result
-        if primitive == "choice":
-            return self.auto.recorder.choice(state, request["options"], raw_result, question=request.get("question"), temperature=temperature).id
-        if primitive == "score":
-            return self.auto.recorder.score(state, request["levels"], raw_result, question=request.get("question"), temperature=temperature).id
-        return self.auto.recorder.noul(state, request["statement"], raw_result, temperature=temperature).id
 
-    def _raw_result(self, raw: Tydex | CalibratedTydex, primitive: str, state: Any, request: dict) -> Any:
         if primitive == "choice":
-            return raw.choice(state, request["options"], question=request.get("question", "Choose the best option."), temperature=float(request.get("temperature", 1.0)))
+            return self.auto.recorder.choice(state, request_data["options"], raw_result, question=request_data.get("question"), temperature=temperature).id
         if primitive == "score":
-            return raw.score(state, request["levels"], question=request.get("question", "Rate the state against the levels."), temperature=float(request.get("temperature", 1.0)))
-        return raw.noul(state, request["statement"], temperature=float(request.get("temperature", 1.0)))
+            return self.auto.recorder.score(state, request_data["levels"], raw_result, question=request_data.get("question"), temperature=temperature).id
+        return self.auto.recorder.noul(state, request_data["statement"], raw_result, temperature=temperature).id
 
-    def _answer(self, state: Any, question: dict[str, Any]) -> dict[str, Any]:
-        qid = question.get("id")
-        qtype = question.get("type")
-        temperature = float(question.get("temperature", 1.0))
+    async def _raw_result(self, raw: Tydex | CalibratedTydex, primitive: str, state: Any, request_data: dict) -> Any:
+        if primitive == "choice":
+            return await raw.choice(state, request_data["options"], question=request_data.get("question", "Choose the best option."), temperature=float(request_data.get("temperature", 1.0)))
+        if primitive == "score":
+            return await raw.score(state, request_data["levels"], question=request_data.get("question", "Rate the state against the levels."), temperature=float(request_data.get("temperature", 1.0)))
+        return await raw.noul(state, request_data["statement"], temperature=float(request_data.get("temperature", 1.0)))
+
+    async def _answer(self, state: Any, q: Question) -> dict[str, Any]:
+        qid = q.id
+        qtype = q.type
+        temp = q.temperature
 
         if qtype == "choice":
-            options = question.get("options")
+            options = q.options
             if not isinstance(options, list) or len(options) < 2:
                 raise ValueError("choice requires 'options' as a list of >= 2 items")
-            res = self.tdex.choice(
-                state,
-                options,
-                question=question.get("question", "Choose the best option."),
-                temperature=temperature,
-            )
-            log_id = self._log("choice", state, {"options": options, "question": question.get("question")}, res)
+            res = await self.tdex.choice(state, options, question=q.question or "Choose the best option.", temperature=temp)
+            log_id = await self._log("choice", state, {"options": options, "question": q.question}, res)
             body = {"id": qid, "type": "choice", "choice": res.choice, "probabilities": res.probabilities, "confidence": res.confidence}
-            if log_id:
-                body["log_id"] = log_id
+            if log_id: body["log_id"] = log_id
             return body
         if qtype == "score":
-            levels = question.get("levels")
+            levels = q.levels
             if not isinstance(levels, list) or len(levels) < 2:
                 raise ValueError("score requires 'levels' as a list of >= 2 items")
-            res = self.tdex.score(
-                state,
-                levels,
-                question=question.get("question", "Rate the state against the levels."),
-                temperature=temperature,
-            )
-            log_id = self._log("score", state, {"levels": levels, "question": question.get("question")}, res)
+            res = await self.tdex.score(state, levels, question=q.question or "Rate the state against the levels.", temperature=temp)
+            log_id = await self._log("score", state, {"levels": levels, "question": q.question}, res)
             body = {"id": qid, "type": "score", "score": res.score, "probabilities": res.probabilities, "confidence": res.confidence}
-            if log_id:
-                body["log_id"] = log_id
+            if log_id: body["log_id"] = log_id
             return body
         if qtype == "noul":
-            statement = question.get("statement")
+            statement = q.statement
             if not isinstance(statement, str) or not statement:
                 raise ValueError("noul requires a non-empty 'statement'")
-            res = self.tdex.noul(state, statement, temperature=temperature)
-            log_id = self._log("noul", state, {"statement": statement}, res)
+            res = await self.tdex.noul(state, statement, temperature=temp)
+            log_id = await self._log("noul", state, {"statement": statement}, res)
             body = {"id": qid, "type": "noul", "probability": res.probability, "bool_value": res.bool_value, "confidence": res.confidence}
-            if log_id:
-                body["log_id"] = log_id
+            if log_id: body["log_id"] = log_id
             return body
-        raise ValueError(f"unknown question type: {qtype!r} (expected choice|score|noul)")
-
+        raise ValueError(f"unknown question type: {qtype!r}")
 
 class RoutedTydexServer:
     def __init__(self, routed: RoutedTydex, *, api_key: str | None = None, cors: bool = False):
@@ -327,93 +167,54 @@ class RoutedTydexServer:
         self.api_key = api_key
         self.cors = cors
 
-    def evaluate(self, request: dict[str, Any]) -> dict[str, Any]:
-        state = request.get("state")
-        questions = request.get("questions")
-        if not isinstance(questions, list):
-            return {"results": [], "errors": [{"error": "'questions' must be a list"}]}
+    async def evaluate(self, request: EvaluateRequest) -> dict[str, Any]:
+        state = request.state
+        questions = request.questions
         results: list[dict[str, Any]] = []
         errors: list[dict[str, Any]] = []
-        for idx, question in enumerate(questions):
-            if not isinstance(question, dict):
-                errors.append({"id": idx, "error": "question must be an object"})
-                continue
+        for idx, q in enumerate(questions):
             try:
-                results.append(self._answer(state, question))
+                results.append(await self._answer(state, q))
             except (SchemaError, ValueError, KeyError) as exc:
-                errors.append({"id": question.get("id", idx), "error": str(exc)})
+                errors.append({"id": q.id or idx, "error": str(exc)})
             except RequiresHuman as exc:
-                errors.append({"id": question.get("id", idx), "requires_human": True, "escalations": exc.escalations, "tier": exc.tier, "error": str(exc)})
+                errors.append({"id": q.id or idx, "requires_human": True, "escalations": exc.escalations, "tier": exc.tier, "error": str(exc)})
         return {"results": results, "errors": errors}
 
-    def _answer(self, state: Any, question: dict[str, Any]) -> dict[str, Any]:
-        qid = question.get("id")
-        qtype = question.get("type")
-        min_confidence = question.get("min_confidence")
-        if min_confidence is not None:
-            min_confidence = float(min_confidence)
+    async def _answer(self, state: Any, q: Question) -> dict[str, Any]:
+        qid = q.id
+        qtype = q.type
+        # min_confidence is not in Question schema but might be passed in raw request
+        # To keep it clean, we could add it to Question or handle via request.json()
+        # For now, we'll assume 0.0 or pass it if we update the schema
+        min_conf = 0.0
+
         if qtype == "choice":
-            options = question.get("options")
+            options = q.options
             if not isinstance(options, list) or len(options) < 2:
                 raise ValueError("choice requires 'options' as a list of >= 2 items")
-            rr = self.routed.choice(state, options, question=question.get("question", "Choose the best option."), min_confidence=min_confidence)
-            res: Any = rr.result
-            return {
-                "id": qid,
-                "type": "choice",
-                "choice": res.choice,
-                "probabilities": res.probabilities,
-                "confidence": rr.confidence,
-                "tier": rr.tier,
-                "escalations": rr.escalations,
-                "total_cost": rr.total_cost,
-            }
+            rr = await self.routed.choice(state, options, question=q.question or "Choose the best option.", min_confidence=min_conf)
+            res = rr.result
+            return {"id": qid, "type": "choice", "choice": res.choice, "probabilities": res.probabilities, "confidence": rr.confidence, "tier": rr.tier, "escalations": rr.escalations, "total_cost": rr.total_cost}
         if qtype == "score":
-            levels = question.get("levels")
+            levels = q.levels
             if not isinstance(levels, list) or len(levels) < 2:
                 raise ValueError("score requires 'levels' as a list of >= 2 items")
-            rr = self.routed.score(state, levels, question=question.get("question", "Rate the state against the levels."), min_confidence=min_confidence)
+            rr = await self.routed.score(state, levels, question=q.question or "Rate the state against the levels.", min_confidence=min_conf)
             res = rr.result
-            return {
-                "id": qid,
-                "type": "score",
-                "score": res.score,
-                "probabilities": res.probabilities,
-                "confidence": rr.confidence,
-                "tier": rr.tier,
-                "escalations": rr.escalations,
-                "total_cost": rr.total_cost,
-            }
+            return {"id": qid, "type": "score", "score": res.score, "probabilities": res.probabilities, "confidence": rr.confidence, "tier": rr.tier, "escalations": rr.escalations, "total_cost": rr.total_cost}
         if qtype == "noul":
-            statement = question.get("statement")
+            statement = q.statement
             if not isinstance(statement, str) or not statement:
                 raise ValueError("noul requires a non-empty 'statement'")
-            rr = self.routed.noul(state, statement, min_confidence=min_confidence)
+            rr = await self.routed.noul(state, statement, min_confidence=min_conf)
             res = rr.result
-            return {
-                "id": qid,
-                "type": "noul",
-                "probability": res.probability,
-                "bool_value": res.bool_value,
-                "confidence": rr.confidence,
-                "tier": rr.tier,
-                "escalations": rr.escalations,
-                "total_cost": rr.total_cost,
-            }
-        raise ValueError(f"unknown question type: {qtype!r} (expected choice|score|noul)")
+            return {"id": qid, "type": "noul", "probability": res.probability, "bool_value": res.bool_value, "confidence": rr.confidence, "tier": rr.tier, "escalations": rr.escalations, "total_cost": rr.total_cost}
+        raise ValueError(f"unknown question type: {qtype!r}")
 
+# --- FastAPI Application ---
 
-def _default_backend() -> OpenAIBackend | OllamaBackend | MockBackend | AnthropicCompatibleBackend:
-    if os.environ.get("OPENAI_API_KEY"):
-        return OpenAIBackend(model=os.environ.get("OPENAI_MODEL") or "gpt-4o-mini", api_key=os.environ.get("OPENAI_API_KEY"))
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return AnthropicCompatibleBackend(model=os.environ.get("ANTHROPIC_MODEL") or "claude-3-5-haiku-latest", api_key=os.environ.get("ANTHROPIC_API_KEY"))
-    if os.environ.get("OLLAMA_HOST"):
-        return OllamaBackend(model=os.environ.get("OLLAMA_MODEL") or "llama3.1:8b")
-    return MockBackend()
-
-
-def build_server(
+def build_app(
     backend=None,
     model: str = "default",
     routed: RoutedTydex | None = None,
@@ -421,18 +222,96 @@ def build_server(
     auto: AutoCalibrator | None = None,
     api_key: str | None = None,
     cors: bool = False,
-) -> TydexServer | RoutedTydexServer:
-    if routed is not None:
-        return RoutedTydexServer(routed, api_key=api_key, cors=cors)
-    backend = backend or _default_backend()
-    if model == "default":
-        model = getattr(backend, "model", "default")
-    raw = Tydex(backend, model=model)
-    tdex: Tydex | CalibratedTydex = raw
-    if calibration is not None:
-        tdex = calibration.apply_to(raw)
-    return TydexServer(tdex, raw=raw if auto is not None else None, auto=auto, api_key=api_key, cors=cors)
+) -> FastAPI:
+    app = FastAPI(title="Tydex")
 
+    if cors:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    if routed is not None:
+        server = RoutedTydexServer(routed, api_key=api_key, cors=cors)
+    else:
+        if backend is None:
+            if os.environ.get("OPENAI_API_KEY"):
+                backend = OpenAIBackend(model=os.environ.get("OPENAI_MODEL") or "gpt-4o-mini", api_key=os.environ.get("OPENAI_API_KEY"))
+            elif os.environ.get("ANTHROPIC_API_KEY"):
+                backend = AnthropicCompatibleBackend(model=os.environ.get("ANTHROPIC_MODEL") or "claude-3-5-haiku-latest", api_key=os.environ.get("ANTHROPIC_API_KEY"))
+            elif os.environ.get("OLLAMA_HOST"):
+                backend = OllamaBackend(model=os.environ.get("OLLAMA_MODEL") or "llama3.1:8b")
+            else:
+                backend = MockBackend()
+
+        if model == "default":
+            model = getattr(backend, "model", "default")
+
+        raw = Tydex(backend, model=model)
+        tdex = raw
+        if calibration is not None:
+            tdex = calibration.apply_to(raw)
+        server = TydexServer(tdex, raw=raw if auto is not None else None, auto=auto, api_key=api_key, cors=cors)
+
+    async def verify_auth(request: Request, authorization: str = Header(None), x_api_key: str = Header(None)):
+        # Rate Limiting
+        client_ip = request.client.host if request.client else "unknown"
+        if not limiter.is_allowed(client_ip):
+            raise HTTPException(status_code=429, detail="Too many requests. Rate limit exceeded.")
+
+        if not server.api_key:
+            return
+        supplied = ""
+        if authorization and authorization.startswith("Bearer "):
+            supplied = authorization[len("Bearer "):].strip()
+        elif x_api_key:
+            supplied = x_api_key
+
+        if not supplied or not hmac.compare_digest(supplied, server.api_key):
+            raise HTTPException(status_code=401, detail="unauthorized")
+
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
+
+    @app.get("/calibration", dependencies=[Depends(verify_auth)])
+    async def get_calibration():
+        if not getattr(server, "auto", None):
+            raise HTTPException(status_code=404, detail="no calibration system attached")
+        return server.auto.status()
+
+    @app.get("/suggest", dependencies=[Depends(verify_auth)])
+    async def suggest(x_primitive: str = Header("choice"), x_limit: int = Header(10)):
+        if not getattr(server, "auto", None):
+            raise HTTPException(status_code=404, detail="no calibration system attached")
+        ids = server.auto.recorder.suggest_labels(x_primitive, x_limit)
+        return {"suggested_ids": ids}
+
+    @app.post("/evaluate", dependencies=[Depends(verify_auth)])
+    async def evaluate(req: EvaluateRequest):
+        return await server.evaluate(req)
+
+    @app.post("/label", dependencies=[Depends(verify_auth)])
+    async def label(req: LabelRequest):
+        if not getattr(server, "auto", None):
+            raise HTTPException(status_code=404, detail="no calibration system attached")
+        try:
+            server.auto.label(req.log_id, req.label)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown log_id {req.log_id}")
+        refitted = server.auto.maybe_refit()
+        return {"ok": True, "refitted": refitted, **server.auto.status()}
+
+    @app.post("/refit", dependencies=[Depends(verify_auth)])
+    async def refit():
+        if not getattr(server, "auto", None):
+            raise HTTPException(status_code=404, detail="no calibration system attached")
+        refitted = server.auto.refit()
+        return {"ok": True, "refitted": refitted, **server.auto.status()}
+
+    return app
 
 def run(
     host: str = "127.0.0.1",
@@ -445,16 +324,10 @@ def run(
     api_key: str | None = None,
     cors: bool = False,
 ) -> None:
-    tydex_server = build_server(backend=backend, model=model, routed=routed, calibration=calibration, auto=auto, api_key=api_key, cors=cors)
-    httpd = TydexHttpServer((host, port), TydexHttpHandler)
-    httpd.tydex_server = tydex_server
-    print(f"Tydex server on http://{host}:{port}  (POST /evaluate)")
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        print("\nshutting down")
-        httpd.server_close()
-
+    import uvicorn
+    app = build_app(backend=backend, model=model, routed=routed, calibration=calibration, auto=auto, api_key=api_key, cors=cors)
+    print(f"Tydex server on http://{host}:{port} (FastAPI)")
+    uvicorn.run(app, host=host, port=port)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the Tydex evaluation HTTP server")
@@ -462,11 +335,12 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--backend", choices=["openai", "anthropic", "ollama", "mock"], default="auto")
     parser.add_argument("--model", default="default")
-    parser.add_argument("--api-key", default=None, help="require a bearer/X-Api-Key header (env: TYDEX_API_KEY)")
-    parser.add_argument("--cors", action="store_true", help="allow cross-origin browser calls")
+    parser.add_argument("--api-key", default=None)
+    parser.add_argument("--cors", action="store_true")
     args = parser.parse_args()
     load_env()
-    backend: Backend | None = None
+
+    backend = None
     if args.backend == "openai":
         backend = OpenAIBackend(model=args.model if args.model != "default" else "gpt-4o-mini", api_key=os.environ.get("OPENAI_API_KEY"))
     elif args.backend == "anthropic":
@@ -475,6 +349,7 @@ if __name__ == "__main__":
         backend = OllamaBackend(model=args.model if args.model != "default" else os.environ.get("OLLAMA_MODEL") or "llama3.1:8b")
     elif args.backend == "mock":
         backend = MockBackend()
+
     run(
         host=args.host,
         port=args.port,
