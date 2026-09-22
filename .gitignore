@@ -8,4 +8,5 @@ venv/
 tydex-calibration.json
 dist/
 build/
+site/
 *.egg-info/
