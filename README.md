@@ -1,5 +1,12 @@
 # tydex
 
+[![PyPI version](https://img.shields.io/pypi/v/tydex.svg)](https://pypi.org/project/tydex/)
+[![Python versions](https://img.shields.io/pypi/pyversions/tydex.svg)](https://pypi.org/project/tydex/)
+[![PyPI format](https://img.shields.io/pypi/format/tydex.svg)](https://pypi.org/project/tydex/)
+[![License: MIT](https://img.shields.io/pypi/l/tydex.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://img.shields.io/github/actions/workflow/status/Dracko000/tydex/ci.yml?branch=main&label=CI)](https://github.com/Dracko000/tydex/actions)
+[![GitHub release](https://img.shields.io/github/v/release/Dracko000/tydex)](https://github.com/Dracko000/tydex/releases)
+
 Typed decision primitives for LLMs — `choice`, `score`, and `noul` (yes/no) — returned as **data with probabilities**, not prose. Built on top of a single model call with greedy decoding, plus calibration, confidence-based escalation, and an iterative re-calibration loop.
 
 tydex is designed as a decision *engine*: consume it via the Python API or the HTTP server. There is no chat UI.
