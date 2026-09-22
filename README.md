@@ -57,10 +57,10 @@ noul    ██████████  100%  (probability + bool_value)
 ## Install
 
 ```bash
-pip install .
+pip install tydex
 ```
 
-Python `>= 3.10`. No third-party runtime dependencies (HTTP backends use stdlib `urllib`).
+From a source checkout: `pip install .`. Python `>= 3.10`. No third-party runtime dependencies (HTTP backends use stdlib `urllib`).
 
 ## Quick start
 
