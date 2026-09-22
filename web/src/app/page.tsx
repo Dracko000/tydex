@@ -5,7 +5,6 @@ import { Reveal } from "@/components/reveal";
 import { Counter } from "@/components/counters";
 import { Terminal } from "@/components/terminal";
 import { CodeBlock } from "@/components/code-block";
-import { CopyButton } from "@/components/copy-button";
 import {
   ArrowRightIcon,
   BoltIcon,
@@ -40,6 +39,7 @@ import {
 } from "@/lib/data";
 
 const YEAR = new Date().getFullYear();
+const ECE_MAX = 0.35;
 
 function Kicker({ children }: { children: ReactNode }) {
   return (
@@ -51,12 +51,10 @@ function Kicker({ children }: { children: ReactNode }) {
   );
 }
 
-function ChapterTitle({ title, className = "" }: { title: string; className?: string }) {
+function ChapterTitle({ title }: { title: string }) {
   return (
     <Reveal>
-      <h2
-        className={`font-mono text-3xl font-semibold tracking-tight text-ink sm:text-4xl ${className}`}
-      >
+      <h2 className="font-mono text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
         {title}
       </h2>
     </Reveal>
@@ -71,17 +69,81 @@ function Lead({ children }: { children: ReactNode }) {
   );
 }
 
-function Sunken({ children }: { children: ReactNode }) {
+function Section({
+  id,
+  title,
+  kicker,
+  lead,
+  children,
+  tone,
+}: {
+  id?: string;
+  title: string;
+  kicker: string;
+  lead?: ReactNode;
+  children: ReactNode;
+  tone?: "raised";
+}) {
   return (
-    <Reveal delay={120}>
-      <div className="mt-4 font-mono text-xs tracking-[0.18em] text-mut uppercase">
-        {children}
+    <section
+      id={id}
+      className={`${tone === "raised" ? "border-y border-line bg-surface/40" : ""} py-24 sm:py-28`}
+    >
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <Kicker>{kicker}</Kicker>
+        <ChapterTitle title={title} />
+        {lead ? <Lead>{lead}</Lead> : null}
+        <div className="mt-12">{children}</div>
       </div>
-    </Reveal>
+    </section>
   );
 }
 
-const ECE_MAX = 0.35;
+function Hairgrid({
+  columns,
+  children,
+}: {
+  columns: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`grid bg-line gap-px border border-line ${columns}`}>
+      {children}
+    </div>
+  );
+}
+
+function Cell({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`bg-bg p-6 lg:p-8 ${className}`}>{children}</div>;
+}
+
+function MonoSub({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-2.5 text-sm leading-6 text-mut">{children}</p>
+  );
+}
+
+function EndpointText() {
+  return (
+    <p className="mt-8 font-mono text-sm leading-8 text-mut">
+      {ENDPOINTS.map((e, i) => (
+        <span key={e.path}>
+          <span className={e.method === "GET" ? "text-brand" : "text-flame"}>
+            {e.method}
+          </span>{" "}
+          <span className="text-ink">{e.path}</span>
+          {i < ENDPOINTS.length - 1 ? <span className="text-line"> &#47;·&#47; </span> : null}
+        </span>
+      ))}
+    </p>
+  );
+}
 
 export default function Home() {
   return (
@@ -90,27 +152,21 @@ export default function Home() {
       <Nav />
 
       {/* ============ HERO ============ */}
-      <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
+      <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-24">
         <div className="grid-faint pointer-events-none absolute inset-0" aria-hidden />
         <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
           <div className="grid items-center gap-14 lg:grid-cols-2">
             <div>
               <Reveal>
-                <div className="mb-6 inline-flex flex-wrap items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5">
+                <div className="mb-6 inline-flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="font-mono text-xs text-mut">
                     v0.1.3 · MIT · Python 3.10–3.13
-                  </span>
-                  <span className="h-3 w-px bg-line" aria-hidden />
-                  <span className="flex items-center gap-1.5 font-mono text-xs text-flame">
-                    <FlagIcon className="h-3.5 w-3.5" />
-                    zero runtime deps
                   </span>
                 </div>
               </Reveal>
               <Reveal delay={60}>
                 <h1 className="font-mono text-4xl font-bold leading-[1.12] tracking-tight text-ink sm:text-5xl lg:text-6xl">
-                  Decisions as{" "}
-                  <span className="text-brand">data</span>,{" "}
+                  Decisions as <span className="text-brand">data</span>,{" "}
                   <br />
                   not prose.
                 </h1>
@@ -120,9 +176,9 @@ export default function Home() {
                   tydex turns any LLM into a decision engine.{" "}
                   <code className="font-mono text-[0.9em] text-ink">choice</code>,{" "}
                   <code className="font-mono text-[0.9em] text-ink">score</code>, and{" "}
-                  <code className="font-mono text-[0.9em] text-ink">noul</code> return JSON
-                  with calibrated probabilities and confidence — one model call, greedy
-                  decoding, built on your existing provider.
+                  <code className="font-mono text-[0.9em] text-ink">noul</code> return
+                  JSON with calibrated probabilities and confidence — one model call,
+                  greedy decoding, built on your existing provider.
                 </p>
               </Reveal>
               <Reveal delay={220}>
@@ -138,7 +194,7 @@ export default function Home() {
                     href={LINKS.docs}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-xl border border-line bg-surface px-5 text-base font-semibold text-ink transition-colors duration-200 hover:border-brand/50 hover:text-brand"
+                    className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-xl border border-line px-5 text-base font-semibold text-ink transition-colors duration-200 hover:text-brand"
                   >
                     <BookIcon className="h-5 w-5" />
                     Read the docs
@@ -148,7 +204,7 @@ export default function Home() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="tydex on GitHub"
-                    className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl border border-line bg-surface text-ink transition-colors duration-200 hover:text-brand"
+                    className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl border border-line text-ink transition-colors duration-200 hover:text-brand"
                   >
                     <GithubIcon className="h-5 w-5" />
                   </a>
@@ -190,8 +246,8 @@ export default function Home() {
       </section>
 
       {/* ============ STATS STRIP ============ */}
-      <section className="border-y border-line bg-surface">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-4 py-12 sm:px-6 lg:grid-cols-4">
+      <section className="border-y border-line">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-8 gap-y-10 px-4 py-12 sm:px-6 lg:grid-cols-4">
           {STATS.map((s) => (
             <Counter key={s.label} value={s.value} suffix={s.suffix} label={s.label} />
           ))}
@@ -199,469 +255,406 @@ export default function Home() {
       </section>
 
       {/* ============ 01 · PROBLEM ============ */}
-      <section className="relative py-24 sm:py-32">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <Kicker>01 · the problem</Kicker>
-          <ChapterTitle title="LLMs answer in prose. Your app needs a decision." />
-          <Lead>
+      <Section
+        kicker="01 · the problem"
+        title="LLMs answer in prose. Your app needs a decision."
+        lead={
+          <>
             Prompting a chat model for a decision leaves you with paragraphs, markdown
             lists, and borrowed confidence. Every downstream system pays the price.
-          </Lead>
+          </>
+        }
+      >
+        <Hairgrid columns="md:grid-cols-3">
+          <Cell>
+            <BracketsIcon className="h-6 w-6 text-brand" />
+            <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
+              Parsing fragility
+            </h3>
+            <MonoSub>
+              Regex over bullet points to recover a single answer. One reworded prompt
+              and your pipeline breaks silently.
+            </MonoSub>
+          </Cell>
+          <Cell>
+            <GaugeIcon className="h-6 w-6 text-brand" />
+            <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
+              Confidence theater
+            </h3>
+            <MonoSub>
+              &ldquo;I&rsquo;m 99% sure&rdquo; ignores calibration. Unfitted probabilities
+              are not decision inputs — they&rsquo;re noise.
+            </MonoSub>
+          </Cell>
+          <Cell>
+            <BoltIcon className="h-6 w-6 text-brand" />
+            <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
+              Multi-turn tug
+            </h3>
+            <MonoSub>
+              Reasoning loops and tool chains multiply token spend. A single greedy call
+              with a schema is enough for most decisions.
+            </MonoSub>
+          </Cell>
+        </Hairgrid>
 
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {[
-              {
-                icon: <BracketsIcon className="h-5 w-5" />,
-                title: "Parsing fragility",
-                body: "Regex over bullet points to recover a single answer. One reworded prompt and your pipeline breaks silently.",
-              },
-              {
-                icon: <GaugeIcon className="h-5 w-5" />,
-                title: "Confidence theater",
-                body: "\"I'm 99% sure\" ignores calibration. Unfitted probabilities are not decision inputs — they're noise.",
-              },
-              {
-                icon: <BoltIcon className="h-5 w-5" />,
-                title: "Multi-turn tug",
-                body: "Reasoning loops and tool chains multiply token spend. A single greedy call with a schema is enough for most decisions.",
-              },
-            ].map((card, i) => (
-              <Reveal key={card.title} delay={i * 90}>
-                <div className="group h-full rounded-2xl border border-line bg-surface p-6 transition-shadow duration-300 hover:shadow-xl hover:shadow-brand/5">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-soft text-brand">
-                    {card.icon}
-                  </div>
-                  <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
-                    {card.title}
-                  </h3>
-                  <p className="mt-2.5 text-sm leading-6 text-mut">{card.body}</p>
-                </div>
-              </Reveal>
-            ))}
+        <div className="mt-16 grid gap-8 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-line">
+          <div className="lg:pr-10">
+            <Reveal>
+              <p className="font-mono text-xs font-semibold tracking-widest text-mut uppercase">
+                raw model output
+              </p>
+              <p className="mt-4 font-mono text-sm leading-7 text-mut">
+                &ldquo;Based on my analysis I would recommend escalating this to an
+                on-call engineer for further investigation, as the payment provider is
+                possibly rate-limiting the upstream integration&hellip;&rdquo;
+              </p>
+              <p className="mt-4 font-mono text-xs text-flame">→ needs parsing</p>
+            </Reveal>
           </div>
-
-          <Reveal delay={140}>
-            <div className="mt-12 overflow-hidden rounded-2xl border border-line bg-surface">
-              <div className="grid md:grid-cols-2">
-                <div className="border-b border-line p-6 md:border-r md:border-b-0">
-                  <div className="font-mono text-xs font-semibold tracking-widest text-mut uppercase">
-                    raw model output
-                  </div>
-                  <p className="mt-3 font-mono text-sm leading-6 text-mut">
-                    &ldquo;Based on my analysis I would recommend escalating this to an on-call
-                    engineer for further investigation, as the payment provider is
-                    possibly rate-limiting the upstream integration&hellip;&rdquo;
-                  </p>
-                  <p className="mt-4 font-mono text-xs text-flame">→ needs parsing</p>
-                </div>
-                <div className="p-6">
-                  <div className="font-mono text-xs font-semibold tracking-widest text-mut uppercase">
-                    tydex output
-                  </div>
-                  <pre className="mt-3 overflow-x-auto font-mono text-sm leading-6">
-                    <code className="text-ink">
-                      <span className="text-tk-k">{"{"}</span>
-                      {"\n  "}<span className="text-tk-k">&quot;choice&quot;</span>
-                      <span className="text-tk-n">: &quot;Escalate&quot;</span>
-                      <span className="text-tk-c">,</span>
-                      {"\n  "}<span className="text-tk-k">&quot;probability&quot;</span>
-                      <span className="text-tk-n">: 0.68</span>
-                      <span className="text-tk-c">,</span>
-                      {"\n  "}<span className="text-tk-k">&quot;confidence&quot;</span>
-                      <span className="text-tk-n">: 0.68</span>
-                      {"\n"}
-                      <span className="text-tk-k">{"}"}</span>
-                    </code>
-                  </pre>
-                  <p className="mt-4 flex items-center gap-2 font-mono text-xs text-brand">
-                    <CheckIcon className="h-4 w-4" /> ready for typed code
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Reveal>
+          <div className="pt-8 lg:pl-10 lg:pt-0">
+            <Reveal delay={80}>
+              <p className="font-mono text-xs font-semibold tracking-widest text-mut uppercase">
+                tydex output
+              </p>
+              <pre className="mt-4 font-mono text-sm leading-7">
+                <code className="text-tk-n">
+                  {`{
+  "choice": "Escalate",
+  "probability": 0.68,
+  "confidence": 0.68
+}`}
+                </code>
+              </pre>
+              <p className="mt-4 flex items-center gap-2 font-mono text-xs text-brand">
+                <CheckIcon className="h-4 w-4" /> ready for typed code
+              </p>
+            </Reveal>
+          </div>
         </div>
-      </section>
+      </Section>
 
       {/* ============ 02 · PRIMITIVES ============ */}
-      <section id="primitives" className="border-t border-line bg-surface py-24 sm:py-32">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <Kicker>02 · the primitives</Kicker>
-          <ChapterTitle title="Three operators. Every decision." />
-          <Lead>
+      <Section
+        id="primitives"
+        tone="raised"
+        kicker="02 · the primitives"
+        title="Three operators. Every decision."
+        lead={
+          <>
             Each primitive is one model call that returns a schema-enforced result with a
             probability distribution — from provider logprobs when available, else a
             calibrated self-estimate.
-          </Lead>
-
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {[
-              {
-                icon: <ListIcon className="h-5 w-5" />,
-                name: "choice",
-                sig: "choice(state, options)",
-                body: "Pick the best option from a list. Returns a full probability distribution over every option.",
-                tags: ["≥ 2 options", "≤ 20 options"],
-              },
-              {
-                icon: <CubeIcon className="h-5 w-5" />,
-                name: "score",
-                sig: "score(state, levels)",
-                body: "Rate a state against ordinal levels — OK / Degraded / Critical, 1–5, reject / accept.",
-                tags: ["ordinal levels", "ordinal voting"],
-              },
-              {
-                icon: <FlagIcon className="h-5 w-5" />,
-                name: "noul",
-                sig: "noul(state, statement)",
-                body: "A yes/no binary decision with a true probability — the building block of checks and gates.",
-                tags: ["p(statement)", "binary"],
-              },
-            ].map((p, i) => (
-              <Reveal key={p.name} delay={i * 90}>
-                <div className="flex h-full flex-col rounded-2xl border border-line bg-bg p-6 transition-shadow duration-300 hover:shadow-xl hover:shadow-brand/5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-soft text-brand">
-                      {p.icon}
-                    </div>
-                    <span className="font-mono text-2xl font-bold text-ink/10">0{i + 1}</span>
-                  </div>
-                  <h3 className="mt-5 font-mono text-xl font-semibold text-ink">{p.name}</h3>
-                  <code className="mt-1 block w-fit rounded-md bg-raise px-2 py-0.5 font-mono text-xs text-brand">
-                    {p.sig}
-                  </code>
-                  <p className="mt-3 flex-1 text-sm leading-6 text-mut">{p.body}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {p.tags.map((t) => (
-                      <span
-                        key={t}
-                        className="rounded-full border border-line px-2.5 py-0.5 font-mono text-[11px] text-mut"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
+          </>
+        }
+      >
+        <Hairgrid columns="md:grid-cols-3">
+          {[
+            {
+              icon: <ListIcon className="h-6 w-6 text-brand" />,
+              num: "01",
+              name: "choice",
+              sig: "choice(state, options)",
+              body: "Pick the best option from a list. Returns a full probability distribution over every option.",
+              tags: "≥ 2 options · ≤ 20 options",
+            },
+            {
+              icon: <CubeIcon className="h-6 w-6 text-brand" />,
+              num: "02",
+              name: "score",
+              sig: "score(state, levels)",
+              body: "Rate a state against ordinal levels — OK / Degraded / Critical, 1–5, reject / accept.",
+              tags: "ordinal levels",
+            },
+            {
+              icon: <FlagIcon className="h-6 w-6 text-brand" />,
+              num: "03",
+              name: "noul",
+              sig: "noul(state, statement)",
+              body: "A yes/no binary decision with a true probability — the building block of checks and gates.",
+              tags: "p(statement) · binary",
+            },
+          ].map((p) => (
+            <Cell key={p.name}>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  {p.icon}
+                  <h3 className="font-mono text-xl font-semibold text-ink">{p.name}</h3>
                 </div>
-              </Reveal>
-            ))}
-          </div>
-
-          <Reveal delay={120}>
-            <div className="mt-12 space-y-5">
-              <CodeBlock
-                label="choice · one call, JSON mode"
-                code={CODE_CHOICE}
-                output={CODE_CHOICE_OUT}
-              />
-              <div className="grid gap-5 md:grid-cols-2">
-                <CodeBlock label="score" code={CODE_SCORE} />
-                <CodeBlock label="noul" code={CODE_NOUL} />
+                <span className="font-mono text-2xl font-bold text-ink/10">{p.num}</span>
               </div>
-            </div>
-          </Reveal>
+              <code className="mt-4 block font-mono text-sm text-brand">{p.sig}</code>
+              <MonoSub>{p.body}</MonoSub>
+              <p className="mt-4 font-mono text-xs text-mut">{p.tags}</p>
+            </Cell>
+          ))}
+        </Hairgrid>
 
-          <Sunken>
-            results: ChoiceResult · ScoreResult · NoulResult — {`{ choice|score|probability, probabilities, confidence, source }`}
-          </Sunken>
+        <div className="mt-16 space-y-6">
+          <Reveal>
+            <CodeBlock
+              label="choice · one call, JSON mode"
+              code={CODE_CHOICE}
+              output={CODE_CHOICE_OUT}
+            />
+          </Reveal>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Reveal>
+              <CodeBlock label="score" code={CODE_SCORE} />
+            </Reveal>
+            <Reveal delay={80}>
+              <CodeBlock label="noul" code={CODE_NOUL} />
+            </Reveal>
+          </div>
         </div>
-      </section>
+
+        <Reveal delay={120}>
+          <p className="mt-8 font-mono text-xs tracking-[0.18em] text-mut uppercase">
+            results: ChoiceResult · ScoreResult · NoulResult
+          </p>
+        </Reveal>
+      </Section>
 
       {/* ============ 03 · CALIBRATION ============ */}
-      <section id="calibration" className="py-24 sm:py-32">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <Kicker>03 · calibration</Kicker>
-          <ChapterTitle title="Probability you can act on." />
-          <Lead>
-            Measured on {BENCHMARKS.reduce((a, b) => a + b.samples, 0)} labeled tickets with
-            gemma4:31b. Temperature scaling fitted on a held-out split drops expected
-            calibration error by up to{" "}
+      <Section
+        id="calibration"
+        kicker="03 · calibration"
+        title="Probability you can act on."
+        lead={
+          <>
+            Measured on {BENCHMARKS.reduce((a, b) => a + b.samples, 0)} labeled tickets
+            with gemma4:31b. Temperature scaling fitted on a held-out split drops
+            expected calibration error by up to{" "}
             <span className="font-mono font-semibold text-flame">15×</span>.
-          </Lead>
-
-          <div className="mt-12 grid gap-5 lg:grid-cols-3">
-            {BENCHMARKS.map((b, i) => (
-              <Reveal key={b.id} delay={i * 90}>
-                <div className="rounded-2xl border border-line bg-surface p-6">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-lg font-semibold text-ink">
-                      {b.name}
-                    </span>
-                    <span className="font-mono text-xs text-mut">T = {b.temp}</span>
+          </>
+        }
+      >
+        <Hairgrid columns="lg:grid-cols-3">
+          {BENCHMARKS.map((b) => (
+            <Cell key={b.id}>
+              <div className="flex items-baseline justify-between">
+                <span className="font-mono text-lg font-semibold text-ink">{b.name}</span>
+                <span className="font-mono text-xs text-mut">T = {b.temp}</span>
+              </div>
+              <div className="mt-8 space-y-4">
+                <div className="flex items-center gap-3">
+                  <span className="w-16 shrink-0 font-mono text-xs text-mut">before</span>
+                  <div className="h-1 flex-1 rounded-full bg-raise">
+                    <div
+                      className="h-full rounded-full bg-mut/40"
+                      style={{ width: `${(b.before / ECE_MAX) * 100}%` }}
+                    />
                   </div>
-                  <div className="mt-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <span className="w-16 shrink-0 font-mono text-xs text-mut">
-                        before
-                      </span>
-                      <div className="h-2.5 flex-1 rounded-full bg-raise">
-                        <div
-                          className="h-full rounded-full bg-mut/40 transition-[width] duration-700"
-                          style={{ width: `${(b.before / ECE_MAX) * 100}%` }}
-                        />
-                      </div>
-                      <span className="w-14 shrink-0 text-right font-mono text-sm text-mut tabular-nums">
-                        {b.before.toFixed(3)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="w-16 shrink-0 font-mono text-xs text-brand">
-                        after
-                      </span>
-                      <div className="h-2.5 flex-1 rounded-full bg-raise">
-                        <div
-                          className="h-full rounded-full bg-flame transition-[width] duration-700"
-                          style={{ width: `${(b.after / ECE_MAX) * 100}%` }}
-                        />
-                      </div>
-                      <span className="w-14 shrink-0 text-right font-mono text-sm font-semibold text-brand tabular-nums">
-                        {b.after.toFixed(3)}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="mt-5 font-mono text-xs text-mut">
-                    ECE · expected calibration error
-                  </p>
+                  <span className="w-12 shrink-0 text-right font-mono text-sm text-mut tabular-nums">
+                    {b.before.toFixed(3)}
+                  </span>
                 </div>
-              </Reveal>
-            ))}
-          </div>
-
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {[
-              {
-                icon: <FlaskIcon className="h-5 w-5" />,
-                title: "Measured, not assumed",
-                body: "An evaluation harness (Ladder Test) plus a 60-ticket labeled set scores every change against ground truth.",
-              },
-              {
-                icon: <RefreshIcon className="h-5 w-5" />,
-                title: "Self-healing loop",
-                body: "Recorder → labeled feedback → isotonic/auto re-fit. The server can re-calibrate without redeploying.",
-              },
-              {
-                icon: <ShieldIcon className="h-5 w-5" />,
-                title: "Escalate with evidence",
-                body: "RoutedTydex hands low-confidence outcomes to a human (a tier) instead of guessing — with full provenance.",
-              },
-            ].map((c, i) => (
-              <Reveal key={c.title} delay={i * 90}>
-                <div className="h-full rounded-2xl border border-line bg-surface p-6">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-soft text-brand">
-                    {c.icon}
+                <div className="flex items-center gap-3">
+                  <span className="w-16 shrink-0 font-mono text-xs text-brand">after</span>
+                  <div className="h-1 flex-1 rounded-full bg-raise">
+                    <div
+                      className="h-full rounded-full bg-flame"
+                      style={{ width: `${(b.after / ECE_MAX) * 100}%` }}
+                    />
                   </div>
-                  <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
-                    {c.title}
-                  </h3>
-                  <p className="mt-2.5 text-sm leading-6 text-mut">{c.body}</p>
+                  <span className="w-12 shrink-0 text-right font-mono text-sm font-semibold text-brand tabular-nums">
+                    {b.after.toFixed(3)}
+                  </span>
                 </div>
-              </Reveal>
-            ))}
-          </div>
+              </div>
+              <p className="mt-6 font-mono text-xs text-mut">
+                ECE · expected calibration error
+              </p>
+            </Cell>
+          ))}
+        </Hairgrid>
+
+        <div className="mt-16 grid gap-8 lg:grid-cols-3 lg:gap-0 lg:divide-x lg:divide-line">
+          {[
+            {
+              icon: <FlaskIcon className="h-6 w-6 text-brand" />,
+              title: "Measured, not assumed",
+              body: "An evaluation harness (Ladder Test) plus a 60-ticket labeled set scores every change against ground truth.",
+            },
+            {
+              icon: <RefreshIcon className="h-6 w-6 text-brand" />,
+              title: "Self-healing loop",
+              body: "Recorder → labeled feedback → isotonic/auto re-fit. The server can re-calibrate without redeploying.",
+            },
+            {
+              icon: <ShieldIcon className="h-6 w-6 text-brand" />,
+              title: "Escalate with evidence",
+              body: "RoutedTydex hands low-confidence outcomes to a human (a tier) instead of guessing — with full provenance.",
+            },
+          ].map((c, i) => (
+            <Reveal key={c.title} delay={i * 80} className={i > 0 ? "pt-8 lg:pt-0 lg:pl-10" : "lg:pr-10"}>
+              <h3 className="flex items-center gap-3 font-mono text-lg font-semibold text-ink">
+                {c.icon}
+                {c.title}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-mut">{c.body}</p>
+            </Reveal>
+          ))}
         </div>
-      </section>
+      </Section>
 
       {/* ============ 04 · ARCHITECTURE ============ */}
-      <section id="architecture" className="border-t border-line bg-surface py-24 sm:py-32">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <Kicker>04 · production architecture</Kicker>
-          <ChapterTitle title="From idea to inference at scale." />
-          <Lead>
+      <Section
+        id="architecture"
+        tone="raised"
+        kicker="04 · production architecture"
+        title="From idea to inference at scale."
+        lead={
+          <>
             tydex ships a batteries-included stack: an async FastAPI server, an
             intelligence layer on top of the core primitives, and durable storage for the
             feedback loop.
-          </Lead>
+          </>
+        }
+      >
+        <Hairgrid columns="sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            {
+              icon: <ServersIcon className="h-6 w-6 text-brand" />,
+              title: "Async FastAPI server",
+              body: "Typed JSON endpoints, API-key auth, CORS, rate limiting, structured logging and response caching. OpenAPI at /docs.",
+            },
+            {
+              icon: <LayersIcon className="h-6 w-6 text-brand" />,
+              title: "EnsembleTydex",
+              body: "Aggregate several backends as a weighted ensemble; probabilities are merged per option, optionally tuned by per-member weights.",
+            },
+            {
+              icon: <RefreshIcon className="h-6 w-6 text-brand" />,
+              title: "RefiningTydex",
+              body: "Below a confidence threshold, the model re-reviews state and options, and both passes are averaged into the final distribution.",
+            },
+            {
+              icon: <ShieldIcon className="h-6 w-6 text-brand" />,
+              title: "Feedback store",
+              body: "Decisions, probabilities and labels persist to SQLite. Labels feed AutoCalibrator.maybe_refit for continuous self-correction.",
+            },
+            {
+              icon: <GaugeIcon className="h-6 w-6 text-brand" />,
+              title: "Auto-calibration",
+              body: "Isotonic and temperature-scaled calibrators, tiered routing with RequiresHuman escalation for low-confidence calls.",
+            },
+            {
+              icon: <FlaskIcon className="h-6 w-6 text-brand" />,
+              title: "Evaluation harness",
+              body: "Ladder Test benchmarks the whole stack on 60 labeled tickets and exposes ECE before/after every calibration change.",
+            },
+          ].map((f) => (
+            <Cell key={f.title}>
+              <h3 className="flex items-center gap-3 font-mono text-lg font-semibold text-ink">
+                {f.icon}
+                {f.title}
+              </h3>
+              <MonoSub>{f.body}</MonoSub>
+            </Cell>
+          ))}
+        </Hairgrid>
 
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                icon: <ServersIcon className="h-5 w-5" />,
-                title: "Async FastAPI server",
-                body: "Typed JSON endpoints, API-key auth, CORS, rate limiting, structured logging and response caching. OpenAPI at /docs.",
-              },
-              {
-                icon: <LayersIcon className="h-5 w-5" />,
-                title: "EnsembleTydex",
-                body: "Aggregate several backends as a weighted ensemble; probabilities are merged per option, optionally tuned by per-member weights.",
-              },
-              {
-                icon: <RefreshIcon className="h-5 w-5" />,
-                title: "RefiningTydex",
-                body: "Below a confidence threshold, the model re-reviews state and options, and both passes are averaged into the final distribution.",
-              },
-              {
-                icon: <ShieldIcon className="h-5 w-5" />,
-                title: "Feedback store",
-                body: "Decisions, probabilities and labels persist to SQLite. Labels feed AutoCalibrator.maybe_refit for continuous self-correction.",
-              },
-              {
-                icon: <GaugeIcon className="h-5 w-5" />,
-                title: "Auto-calibration",
-                body: "Isotonic and temperature-scaled calibrators, tiered routing with RequiresHuman escalation for low-confidence calls.",
-              },
-              {
-                icon: <FlaskIcon className="h-5 w-5" />,
-                title: "Evaluation harness",
-                body: "Ladder Test benchmarks the whole stack on 60 labeled tickets and exposes ECE before/after every calibration change.",
-              },
-            ].map((f, i) => (
-              <Reveal key={f.title} delay={(i % 3) * 90}>
-                <div className="h-full rounded-2xl border border-line bg-bg p-6 transition-shadow duration-300 hover:shadow-xl hover:shadow-brand/5">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-soft text-brand">
-                    {f.icon}
-                  </div>
-                  <h3 className="mt-5 font-mono text-lg font-semibold text-ink">
-                    {f.title}
-                  </h3>
-                  <p className="mt-2.5 text-sm leading-6 text-mut">{f.body}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-
-          <Reveal delay={100}>
-            <div className="mt-12 flex flex-wrap items-center gap-3">
-              <span className="font-mono text-xs tracking-widest text-mut uppercase">
-                run it
-              </span>
-              {ENDPOINTS.map((e) => (
-                <span
-                  key={e.path}
-                  className="inline-flex items-center gap-2 rounded-full border border-line bg-bg px-3 py-1.5"
-                >
-                  <span
-                    className={`font-mono text-[11px] font-bold ${
-                      e.method === "GET" ? "text-brand" : "text-flame"
-                    }`}
-                  >
-                    {e.method}
-                  </span>
-                  <code className="font-mono text-xs text-ink">{e.path}</code>
-                </span>
-              ))}
-            </div>
-          </Reveal>
-        </div>
-      </section>
+        <EndpointText />
+      </Section>
 
       {/* ============ 05 · GET STARTED ============ */}
-      <section id="install" className="py-24 sm:py-32">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <Kicker>05 · get started</Kicker>
-          <ChapterTitle title="Live in five lines." />
-          <Lead>
-            Install from PyPI, or run the container from GHCR. No runtime dependencies in
-            the core — the async server needs two optional extras.
-          </Lead>
-
-          <div className="mt-12 grid gap-5 lg:grid-cols-2">
-            <Reveal>
-              <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-                <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-                  <span className="font-mono text-xs font-medium text-mut">
-                    install · terminal
-                  </span>
-                  <CopyButton text={`${CODE_INSTALL}\n`} label="install" />
-                </div>
-                <pre className="overflow-x-auto p-5 font-mono text-sm leading-6">
-                  <code className="text-ink">
-                    <span className="text-tk-c">$</span> <span className="text-brand">pip install</span>{" "}
-                    <span className="text-tk-s">tydex</span>
-                  </code>
-                </pre>
-              </div>
-            </Reveal>
-            <Reveal delay={100}>
-              <CodeBlock label="server · async FastAPI" code={CODE_SERVER} />
-            </Reveal>
-          </div>
-
+      <Section
+        id="install"
+        kicker="05 · get started"
+        title="Live in five lines."
+        lead={
+          <>
+            Install from PyPI, or run the container from GHCR. No runtime dependencies
+            in the core — the async server needs two optional extras.
+          </>
+        }
+      >
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Reveal>
+            <CodeBlock
+              label="install · terminal"
+              code={`$ ${CODE_INSTALL}`}
+              hideToggle
+              noPad
+            />
+          </Reveal>
           <Reveal delay={80}>
-            <div className="mt-12 grid gap-5 md:grid-cols-2">
-              <div className="rounded-2xl border border-line bg-surface p-6">
-                <h3 className="font-mono text-sm font-semibold tracking-widest text-mut uppercase">
-                  runs anywhere
-                </h3>
-                <ul className="mt-4 space-y-3 text-sm text-ink">
-                  <li className="flex items-center gap-3">
-                    <CheckIcon className="h-4 w-4 shrink-0 text-brand" />
-                    wheel on PyPI —{" "}
-                    <code className="font-mono text-xs">pip install tydex</code>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <CheckIcon className="h-4 w-4 shrink-0 text-brand" />
-                    Docker image —{" "}
-                    <code className="font-mono text-xs">
-                      docker pull ghcr.io/dracko000/tydex
-                    </code>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <CheckIcon className="h-4 w-4 shrink-0 text-brand" />
-                    CLI included —{" "}
-                    <code className="font-mono text-xs">tydex providers</code>
-                  </li>
-                </ul>
-              </div>
-              <div className="rounded-2xl border border-line bg-surface p-6">
-                <h3 className="font-mono text-sm font-semibold tracking-widest text-mut uppercase">
-                  public artifacts
-                </h3>
-                <div className="mt-4 flex flex-wrap gap-x-3 gap-y-2">
-                  <a href={LINKS.pypi} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src="https://img.shields.io/pypi/v/tydex.svg"
-                      alt="PyPI version"
-                      className="h-6"
-                    />
-                  </a>
-                  <a href={LINKS.pypi} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src="https://img.shields.io/pypi/pyversions/tydex.svg"
-                      alt="Python versions"
-                      className="h-6"
-                    />
-                  </a>
-                  <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer">
-                    <img
-                      src="https://img.shields.io/pypi/l/tydex.svg"
-                      alt="License MIT"
-                      className="h-6"
-                    />
-                  </a>
-                  <a href={LINKS.github} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src="https://img.shields.io/github/actions/workflow/status/Dracko000/tydex/ci.yml?branch=main&label=CI"
-                      alt="CI"
-                      className="h-6"
-                    />
-                  </a>
-                  <a href={LINKS.releases} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src="https://img.shields.io/github/v/release/Dracko000/tydex"
-                      alt="GitHub release"
-                      className="h-6"
-                    />
-                  </a>
-                  <a href={LINKS.docs} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src="https://img.shields.io/badge/docs-live-2ea44f"
-                      alt="Docs live"
-                      className="h-6"
-                    />
-                  </a>
-                </div>
-              </div>
-            </div>
+            <CodeBlock label="server · async FastAPI" code={CODE_SERVER} />
           </Reveal>
         </div>
-      </section>
+
+        <div className="mt-16 grid gap-10 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-line">
+          <div className="lg:pr-10">
+            <Reveal>
+              <p className="font-mono text-xs font-semibold tracking-widest text-mut uppercase">
+                runs anywhere
+              </p>
+              <ul className="mt-5 space-y-3 font-mono text-sm text-ink">
+                <li className="flex items-center gap-3">
+                  <CheckIcon className="h-4 w-4 shrink-0 text-brand" />
+                  pip install tydex
+                </li>
+                <li className="flex items-center gap-3">
+                  <CheckIcon className="h-4 w-4 shrink-0 text-brand" />
+                  docker pull ghcr.io/dracko000/tydex
+                </li>
+                <li className="flex items-center gap-3">
+                  <CheckIcon className="h-4 w-4 shrink-0 text-brand" />
+                  tydex providers in the CLI
+                </li>
+              </ul>
+            </Reveal>
+          </div>
+          <div className="pt-10 lg:pl-10 lg:pt-0">
+            <Reveal delay={80}>
+              <p className="font-mono text-xs font-semibold tracking-widest text-mut uppercase">
+                public artifacts
+              </p>
+              <div className="mt-5 flex flex-wrap gap-x-3 gap-y-2">
+                <a href={LINKS.pypi} target="_blank" rel="noopener noreferrer" aria-label="PyPI version">
+                  <img src="https://img.shields.io/pypi/v/tydex.svg" alt="PyPI version" className="h-6" />
+                </a>
+                <a href={LINKS.pypi} target="_blank" rel="noopener noreferrer" aria-label="Python versions">
+                  <img src="https://img.shields.io/pypi/pyversions/tydex.svg" alt="Python versions" className="h-6" />
+                </a>
+                <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer" aria-label="License">
+                  <img src="https://img.shields.io/pypi/l/tydex.svg" alt="License: MIT" className="h-6" />
+                </a>
+                <a href={LINKS.github} target="_blank" rel="noopener noreferrer" aria-label="CI status">
+                  <img
+                    src="https://img.shields.io/github/actions/workflow/status/Dracko000/tydex/ci.yml?branch=main&label=CI"
+                    alt="CI"
+                    className="h-6"
+                  />
+                </a>
+                <a href={LINKS.releases} target="_blank" rel="noopener noreferrer" aria-label="Release">
+                  <img
+                    src="https://img.shields.io/github/v/release/Dracko000/tydex"
+                    alt="GitHub release"
+                    className="h-6"
+                  />
+                </a>
+                <a href={LINKS.docs} target="_blank" rel="noopener noreferrer" aria-label="Docs">
+                  <img
+                    src="https://img.shields.io/badge/docs-live-2ea44f"
+                    alt="Docs live"
+                    className="h-6"
+                  />
+                </a>
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </Section>
 
       {/* ============ CLIMAX CTA ============ */}
-      <section className="pb-24 sm:pb-32">
+      <section className="pb-24 sm:pb-28">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <Reveal>
-            <div className="relative overflow-hidden rounded-3xl border border-line bg-surface px-6 py-14 text-center sm:px-12">
+            <div className="relative border-y border-line">
               <div className="grid-faint pointer-events-none absolute inset-0" aria-hidden />
-              <div className="relative">
+              <div className="relative py-16 text-center sm:py-20">
                 <BoltIcon className="mx-auto h-10 w-10 text-flame" />
                 <h2 className="mt-4 font-mono text-3xl font-bold tracking-tight text-ink sm:text-4xl">
                   Stop parsing prose.
@@ -686,7 +679,7 @@ export default function Home() {
                     href={LINKS.github}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-xl border border-line bg-bg px-5 text-base font-semibold text-ink transition-colors duration-200 hover:text-brand"
+                    className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-xl border border-line px-5 text-base font-semibold text-ink transition-colors duration-200 hover:text-brand"
                   >
                     <GithubIcon className="h-5 w-5" />
                     Star on GitHub
@@ -700,14 +693,11 @@ export default function Home() {
       </section>
 
       {/* ============ FOOTER ============ */}
-      <footer className="border-t border-line bg-surface">
+      <footer className="border-t border-line">
         <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
           <div className="grid gap-10 md:grid-cols-4">
             <div className="md:col-span-2">
-              <div className="flex items-center gap-2.5">
-                <BoltIcon className="h-5 w-5 text-brand" />
-                <span className="font-mono text-lg font-semibold text-ink">tydex</span>
-              </div>
+              <span className="font-mono text-lg font-semibold text-ink">tydex</span>
               <p className="mt-3 max-w-sm text-sm text-mut">
                 Typed decision primitives for LLMs. Built as data, kept calibrated,
                 shipped as a library.
@@ -721,10 +711,26 @@ export default function Home() {
                 Product
               </div>
               <ul className="mt-3 space-y-2 text-sm">
-                <li><a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href="#primitives">Primitives</a></li>
-                <li><a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href="#calibration">Calibration</a></li>
-                <li><a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href="#architecture">Architecture</a></li>
-                <li><a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href="#install">Install</a></li>
+                <li>
+                  <a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href="#primitives">
+                    Primitives
+                  </a>
+                </li>
+                <li>
+                  <a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href="#calibration">
+                    Calibration
+                  </a>
+                </li>
+                <li>
+                  <a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href="#architecture">
+                    Architecture
+                  </a>
+                </li>
+                <li>
+                  <a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href="#install">
+                    Install
+                  </a>
+                </li>
               </ul>
             </div>
             <div>
