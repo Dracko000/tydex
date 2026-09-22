@@ -110,14 +110,16 @@ tdex.choice(state, options, temperature=2.0)      # sharpen/soften via p^(1/T)
 
 All backends speak plain HTTP to a chat-completions-style or Messages-style API.
 
-| Backend | Family | logprobs | Notes |
+| Backend | Family | logprobs | CLI provider |
 |---|---|---|---|
-| `MockBackend` | — | yes | deterministic fixture for tests/demos |
-| `OpenAIBackend` | OpenAI | yes | `api.openai.com/v1` |
-| `OpenAICompatibleBackend` | any `/v1/chat/completions` | toggle | vLLM, LM Studio, Ollama OpenAI endpoint… |
-| `LocalOpenAIBackend` | OpenAI-compatible | toggle | convenience alias for local endpoints, `api_key="not-needed"` |
-| `OllamaBackend` | Ollama `/api/chat` | no | native Ollama JSON API |
-| `AnthropicCompatibleBackend` | Messages `/v1/messages` | no | Anthropic native + compatible proxies |
+| `MockBackend` | — | yes | `mock` |
+| `OpenAIBackend` | OpenAI | yes | `openai` |
+| `OpenAICompatibleBackend` | any `/v1/chat/completions` | toggle | `openai_compatible_cloud` / `openai_compatible_local` |
+| `LocalOpenAIBackend` | OpenAI-compatible | toggle | — |
+| `OllamaBackend` | Ollama `/api/chat` | no | `ollama` |
+| `AnthropicCompatibleBackend` | Messages `/v1/messages` | no | `anthropic` |
+
+`openai_compatible_cloud` defaults to `https://api.openai.com/v1` (override with `OPENAI_BASE_URL` or `--base-url`) and reads `OPENAI_API_KEY`/`OLLAMA_API_KEY`; `openai_compatible_local` targets a server on your machine — `http://localhost:8000/v1` by default (override with `OLLAMA_HOST`) — and accepts the same two key vars.
 
 ```python
 from tydex import AnthropicCompatibleBackend, Tydex
@@ -132,7 +134,7 @@ tdex = Tydex(
 )
 ```
 
-The OpenAI SDK is **not** required; the new openai- and anthropic-compatible backends use stdlib HTTP.
+The OpenAI SDK is **not** required; every backend uses stdlib HTTP.
 
 ## Calibration
 
@@ -253,7 +255,7 @@ tydex providers                      # show providers, endpoints, key vars, conf
 tydex ask --type noul --statement "A week has seven days"
 tydex ask --provider openai --type choice \
        --options "refund,replace" --state '{"ticket": "wrong item shipped"}'
-tydex ask --provider openai-compatible --base-url https://ollama.com/v1 \
+tydex ask --provider openai_compatible_cloud --base-url https://ollama.com/v1 \
        --model gemma4:31b --no-logprobs --type noul --statement "..."
 ```
 

@@ -17,7 +17,7 @@ from .backends import (
 from .config import env_api_key
 from .core import SchemaError, Tydex
 
-PROVIDERS = ("auto", "openai", "openai-compatible", "anthropic", "ollama", "mock")
+PROVIDERS = ("auto", "openai", "openai_compatible_local", "openai_compatible_cloud", "anthropic", "ollama", "mock")
 
 
 class CliError(Exception):
@@ -30,7 +30,7 @@ def _auto_provider() -> str:
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "anthropic"
     if os.environ.get("OLLAMA_API_KEY"):
-        return "openai-compatible"
+        return "openai_compatible_cloud"
     if os.environ.get("OLLAMA_HOST"):
         return "ollama"
     return "mock"
@@ -51,10 +51,15 @@ def resolve_backend(
         if not api_key:
             raise CliError("OpenAI needs an API key: set OPENAI_API_KEY or pass --api-key")
         return OpenAIBackend(model=model, api_key=api_key, base_url=base_url)
-    if provider == "openai-compatible":
+    if provider == "openai_compatible_local":
         model = model or os.environ.get("OPENAI_MODEL") or "gpt-4o-mini"
         api_key = api_key or env_api_key("OLLAMA_API_KEY", "OPENAI_API_KEY")
         base_url = base_url or os.environ.get("OLLAMA_HOST") or "http://localhost:8000/v1"
+        return OpenAICompatibleBackend(model=model, api_key=api_key, base_url=base_url, supports_logprobs=supports_logprobs)
+    if provider == "openai_compatible_cloud":
+        model = model or os.environ.get("OPENAI_MODEL") or "gpt-4o-mini"
+        api_key = api_key or env_api_key("OPENAI_API_KEY", "OLLAMA_API_KEY")
+        base_url = base_url or os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1"
         return OpenAICompatibleBackend(model=model, api_key=api_key, base_url=base_url, supports_logprobs=supports_logprobs)
     if provider == "anthropic":
         model = model or os.environ.get("ANTHROPIC_MODEL") or "claude-3-5-haiku-latest"
@@ -72,32 +77,36 @@ def resolve_backend(
 
 
 def cmd_providers(args: argparse.Namespace) -> int:
-    names = ("openai", "openai-compatible", "anthropic", "ollama", "mock")
+    names = ("openai", "openai_compatible_local", "openai_compatible_cloud", "anthropic", "ollama", "mock")
     headers = ("provider", "api-key", "endpoint", "model", "configured")
     configured = {
         "openai": env_api_key("OPENAI_API_KEY"),
-        "openai-compatible": env_api_key("OLLAMA_API_KEY", "OPENAI_API_KEY"),
+        "openai_compatible_local": env_api_key("OLLAMA_API_KEY", "OPENAI_API_KEY"),
+        "openai_compatible_cloud": env_api_key("OPENAI_API_KEY", "OLLAMA_API_KEY"),
         "anthropic": env_api_key("ANTHROPIC_API_KEY"),
         "ollama": "local",
         "mock": "always",
     }
     models = {
         "openai": os.environ.get("OPENAI_MODEL") or "gpt-4o-mini",
-        "openai-compatible": os.environ.get("OPENAI_MODEL") or "gpt-4o-mini",
+        "openai_compatible_local": os.environ.get("OPENAI_MODEL") or "gpt-4o-mini",
+        "openai_compatible_cloud": os.environ.get("OPENAI_MODEL") or "gpt-4o-mini",
         "anthropic": os.environ.get("ANTHROPIC_MODEL") or "claude-3-5-haiku-latest",
         "ollama": os.environ.get("OLLAMA_MODEL") or "llama3.1:8b",
         "mock": "mock",
     }
     endpoints = {
         "openai": "https://api.openai.com/v1",
-        "openai-compatible": os.environ.get("OLLAMA_HOST") or "http://localhost:8000/v1",
+        "openai_compatible_local": os.environ.get("OLLAMA_HOST") or "http://localhost:8000/v1",
+        "openai_compatible_cloud": os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1",
         "anthropic": "https://api.anthropic.com",
         "ollama": os.environ.get("OLLAMA_HOST") or "http://localhost:11434",
         "mock": "-",
     }
     keys = {
         "openai": "OPENAI_API_KEY",
-        "openai-compatible": "OLLAMA_API_KEY / OPENAI_API_KEY",
+        "openai_compatible_local": "OLLAMA_API_KEY / OPENAI_API_KEY",
+        "openai_compatible_cloud": "OPENAI_API_KEY / OLLAMA_API_KEY",
         "anthropic": "ANTHROPIC_API_KEY",
         "ollama": "none",
         "mock": "none",
@@ -191,7 +200,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ask.add_argument("--model", default=None, help="model name; falls back to provider env/model default")
     p_ask.add_argument("--base-url", default=None, help="override the provider endpoint base URL")
     p_ask.add_argument("--api-key", default=None, help="API key; falls back to provider env key (never echoed)")
-    p_ask.add_argument("--no-logprobs", action="store_true", help="force openai-compatible provider to self-estimate (no token logprobs)")
+    p_ask.add_argument("--no-logprobs", action="store_true", help="force an openai-compatible provider to self-estimate (no token logprobs)")
     p_ask.add_argument("--type", choices=["choice", "score", "noul"], required=True)
     p_ask.add_argument("--state", default="{}", help="JSON object as decision context")
     p_ask.add_argument("--options", default=None, help="comma-separated options (for choice)")

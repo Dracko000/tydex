@@ -27,7 +27,7 @@ class AutoProviderTest(unittest.TestCase):
         self.assertEqual(_auto_provider(), "anthropic")
         os.environ.pop("ANTHROPIC_API_KEY")
         os.environ["OLLAMA_API_KEY"] = "k"
-        self.assertEqual(_auto_provider(), "openai-compatible")
+        self.assertEqual(_auto_provider(), "openai_compatible_cloud")
         os.environ.pop("OLLAMA_API_KEY")
         os.environ["OLLAMA_HOST"] = "http://x"
         self.assertEqual(_auto_provider(), "ollama")
@@ -57,10 +57,15 @@ class ResolveBackendTest(unittest.TestCase):
         backend = resolve_backend("anthropic", api_key="k")
         self.assertIsInstance(backend, AnthropicCompatibleBackend)
 
-    def test_openai_compatible(self):
-        backend = resolve_backend("openai-compatible", api_key="k", base_url="http://x/v1", model="m", supports_logprobs=False)
+    def test_openai_compatible_local(self):
+        backend = resolve_backend("openai_compatible_local", api_key="k", base_url="http://x/v1", model="m", supports_logprobs=False)
         self.assertIsInstance(backend, OpenAICompatibleBackend)
         self.assertFalse(backend.supports_logprobs)
+
+    def test_openai_compatible_cloud_defaults_to_openai_cloud(self):
+        backend = resolve_backend("openai_compatible_cloud", api_key="k", model="m")
+        self.assertIsInstance(backend, OpenAICompatibleBackend)
+        self.assertEqual(backend.base_url, "https://api.openai.com/v1")
 
 
 class CliIntegrationTest(unittest.TestCase):
@@ -116,7 +121,7 @@ class CliIntegrationTest(unittest.TestCase):
         with contextlib.redirect_stdout(out):
             rc = cmd_providers(type("NS", (), {})())
         self.assertEqual(rc, 0)
-        for name in ("openai", "openai-compatible", "anthropic", "ollama", "mock"):
+        for name in ("openai", "openai_compatible_local", "openai_compatible_cloud", "anthropic", "ollama", "mock"):
             self.assertIn(name, out.getvalue())
 
     def test_no_key_runtime_error(self):
