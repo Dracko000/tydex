@@ -580,8 +580,9 @@ export default function Home() {
         title="Live in five lines."
         lead={
           <>
-            Install from PyPI, or run the container from GHCR. No runtime dependencies
-            in the core — the async server needs two optional extras.
+            Install from PyPI, or run the container from GHCR. The core ships with a single
+            runtime dependency (async HTTP via httpx) — the server adds FastAPI + Uvicorn as
+            an optional extra.
           </>
         }
       >

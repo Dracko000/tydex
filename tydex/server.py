@@ -7,9 +7,8 @@ import logging
 import os
 import time
 from collections import defaultdict
-from typing import Any
+from typing import Any, cast
 
-# ... (existing imports)
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -25,7 +24,7 @@ logger = logging.getLogger("tydex")
 class RateLimiter:
     def __init__(self, requests_per_minute: int = 60):
         self.rpm = requests_per_minute
-        self.history = defaultdict(list)
+        self.history: defaultdict[str, list[float]] = defaultdict(list)
 
     def is_allowed(self, client_id: str) -> bool:
         now = time.time()
@@ -39,13 +38,12 @@ class RateLimiter:
 limiter = RateLimiter(requests_per_minute=100)
 
 # --- Schemas ---
-# ... (rest of the file)
 
 from .autocal import AutoCalibrator
-from .backends import AnthropicCompatibleBackend, MockBackend, OllamaBackend, OpenAIBackend
+from .backends import AnthropicCompatibleBackend, Backend, MockBackend, OllamaBackend, OpenAIBackend
 from .calibrated import CalibratedTydex, CalibrationSystem
 from .config import load_env
-from .core import SchemaError, Tydex
+from .core import ChoiceResult, NoulResult, SchemaError, ScoreResult, Tydex
 from .routing import RequiresHuman, RoutedTydex
 
 # --- Schemas ---
@@ -58,6 +56,7 @@ class Question(BaseModel):
     statement: str | None = None
     question: str | None = None
     temperature: float = 1.0
+    min_confidence: float | None = None
 
 class EvaluateRequest(BaseModel):
     state: Any = None
@@ -109,7 +108,6 @@ class TydexServer:
         temperature = float(request_data.get("temperature", 1.0))
 
         if raw is not self.tdex:
-            # We need a way to get raw results async. Since Tydex methods are now async:
             raw_result = await self._raw_result(raw, primitive, state, request_data)
         else:
             raw_result = result
@@ -167,6 +165,7 @@ class TydexServer:
 class RoutedTydexServer:
     def __init__(self, routed: RoutedTydex, *, api_key: str | None = None, cors: bool = False):
         self.routed = routed
+        self.auto: AutoCalibrator | None = None
         self.api_key = api_key
         self.cors = cors
 
@@ -187,22 +186,19 @@ class RoutedTydexServer:
     async def _answer(self, state: Any, q: Question) -> dict[str, Any]:
         qid = q.id
         qtype = q.type
-        # min_confidence is not in Question schema but might be passed in raw request
-        # To keep it clean, we could add it to Question or handle via request.json()
-        # For now, we'll assume 0.0 or pass it if we update the schema
-        min_conf = 0.0
+        min_conf = q.min_confidence
 
         if qtype == "choice":
             options = q.options
             if not isinstance(options, list) or len(options) < 2:
                 raise ValueError("choice requires 'options' as a list of >= 2 items")
             rr = await self.routed.choice(state, options, question=q.question or "Choose the best option.", min_confidence=min_conf)
-            res = rr.result
+            result_choice = cast(ChoiceResult, rr.result)
             return {
                 "id": qid,
                 "type": "choice",
-                "choice": res.choice,
-                "probabilities": res.probabilities,
+                "choice": result_choice.choice,
+                "probabilities": result_choice.probabilities,
                 "confidence": rr.confidence,
                 "tier": rr.tier,
                 "escalations": rr.escalations,
@@ -213,12 +209,12 @@ class RoutedTydexServer:
             if not isinstance(levels, list) or len(levels) < 2:
                 raise ValueError("score requires 'levels' as a list of >= 2 items")
             rr = await self.routed.score(state, levels, question=q.question or "Rate the state against the levels.", min_confidence=min_conf)
-            res = rr.result
+            result_score = cast(ScoreResult, rr.result)
             return {
                 "id": qid,
                 "type": "score",
-                "score": res.score,
-                "probabilities": res.probabilities,
+                "score": result_score.score,
+                "probabilities": result_score.probabilities,
                 "confidence": rr.confidence,
                 "tier": rr.tier,
                 "escalations": rr.escalations,
@@ -229,12 +225,12 @@ class RoutedTydexServer:
             if not isinstance(statement, str) or not statement:
                 raise ValueError("noul requires a non-empty 'statement'")
             rr = await self.routed.noul(state, statement, min_confidence=min_conf)
-            res = rr.result
+            result_noul = cast(NoulResult, rr.result)
             return {
                 "id": qid,
                 "type": "noul",
-                "probability": res.probability,
-                "bool_value": res.bool_value,
+                "probability": result_noul.probability,
+                "bool_value": result_noul.bool_value,
                 "confidence": rr.confidence,
                 "tier": rr.tier,
                 "escalations": rr.escalations,
@@ -264,7 +260,7 @@ def build_app(
         )
 
     if routed is not None:
-        server = RoutedTydexServer(routed, api_key=api_key, cors=cors)
+        server: TydexServer | RoutedTydexServer = RoutedTydexServer(routed, api_key=api_key, cors=cors)
     else:
         if backend is None:
             if os.environ.get("OPENAI_API_KEY"):
@@ -280,7 +276,7 @@ def build_app(
             model = getattr(backend, "model", "default")
 
         raw = Tydex(backend, model=model)
-        tdex = raw
+        tdex: Tydex | CalibratedTydex = raw
         if calibration is not None:
             tdex = calibration.apply_to(raw)
         server = TydexServer(tdex, raw=raw if auto is not None else None, auto=auto, api_key=api_key, cors=cors)
@@ -308,13 +304,13 @@ def build_app(
 
     @app.get("/calibration", dependencies=[Depends(verify_auth)])
     async def get_calibration():
-        if not getattr(server, "auto", None):
+        if not server.auto:
             raise HTTPException(status_code=404, detail="no calibration system attached")
         return server.auto.status()
 
     @app.get("/suggest", dependencies=[Depends(verify_auth)])
     async def suggest(x_primitive: str = Header("choice"), x_limit: int = Header(10)):
-        if not getattr(server, "auto", None):
+        if not server.auto:
             raise HTTPException(status_code=404, detail="no calibration system attached")
         ids = server.auto.recorder.suggest_labels(x_primitive, x_limit)
         return {"suggested_ids": ids}
@@ -325,7 +321,7 @@ def build_app(
 
     @app.post("/label", dependencies=[Depends(verify_auth)])
     async def label(req: LabelRequest):
-        if not getattr(server, "auto", None):
+        if not server.auto:
             raise HTTPException(status_code=404, detail="no calibration system attached")
         try:
             server.auto.label(req.log_id, req.label)
@@ -336,7 +332,7 @@ def build_app(
 
     @app.post("/refit", dependencies=[Depends(verify_auth)])
     async def refit():
-        if not getattr(server, "auto", None):
+        if not server.auto:
             raise HTTPException(status_code=404, detail="no calibration system attached")
         refitted = server.auto.refit()
         return {"ok": True, "refitted": refitted, **server.auto.status()}
@@ -370,7 +366,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     load_env()
 
-    backend = None
+    backend: Backend | None = None
     if args.backend == "openai":
         backend = OpenAIBackend(model=args.model if args.model != "default" else "gpt-4o-mini", api_key=os.environ.get("OPENAI_API_KEY"))
     elif args.backend == "anthropic":

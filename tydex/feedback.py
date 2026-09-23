@@ -6,9 +6,10 @@ import sqlite3
 import threading
 import uuid
 from collections.abc import Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Iterator
 
 from .calibration import tune_temperature
 from .core import ChoiceResult, NoulResult, ScoreResult, Tydex
@@ -16,6 +17,40 @@ from .core import ChoiceResult, NoulResult, ScoreResult, Tydex
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+@contextmanager
+def _db(path: str) -> Iterator[sqlite3.Connection]:
+    conn = sqlite3.connect(path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
+
+
+def _is_sqlite_db(path: str) -> bool:
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute("SELECT 1").fetchone()
+        return True
+    except sqlite3.DatabaseError:
+        return False
+    finally:
+        conn.close()
+
+
+def _row_to_entry(row: tuple) -> Any:
+    return {
+        "id": row[0], "ts": row[1], "primitive": row[2], "state": json.loads(row[3]),
+        "question": row[4], "options": json.loads(row[5]) if row[5] else None,
+        "levels": json.loads(row[6]) if row[6] else None, "statement": row[7],
+        "temperature": row[8], "choice": row[9], "score": row[10],
+        "probability": row[11], "probabilities": json.loads(row[12]) if row[12] else None,
+        "confidence": row[13], "source": row[14], "tier": row[15],
+        "escalations": json.loads(row[16]) if row[16] else [], "cost": row[17],
+        "label": row[18],
+    }
 
 
 @dataclass
@@ -59,34 +94,43 @@ class Recorder:
     def __init__(self, path: str = "tydex-feedback.db"):
         self.path = path
         self._lock = threading.RLock()
+        self._entries: list[LogEntry] = []
         self._init_db()
+        self.load()
 
     def _init_db(self) -> None:
         with self._lock:
-            with sqlite3.connect(self.path) as conn:
+            if os.path.exists(self.path) and not _is_sqlite_db(self.path):
+                self._import_legacy_logs()
+            else:
+                self._create_schema()
+
+    def _create_schema(self) -> None:
+        with self._lock:
+            with _db(self.path) as conn:
                 conn.execute("""
-                    CREATE TABLE IF NOT EXISTS logs (
-                        id TEXT PRIMARY KEY,
-                        ts TEXT,
-                        primitive TEXT,
-                        state TEXT,
-                        question TEXT,
-                        options TEXT,
-                        levels TEXT,
-                        statement TEXT,
-                        temperature REAL,
-                        choice TEXT,
-                        score TEXT,
-                        probability REAL,
-                        probabilities TEXT,
-                        confidence REAL,
-                        source TEXT,
-                        tier TEXT,
-                        escalations TEXT,
-                        cost REAL,
-                        label TEXT
-                    )
-                """)
+CREATE TABLE IF NOT EXISTS logs (
+                    id TEXT PRIMARY KEY,
+                    ts TEXT,
+                    primitive TEXT,
+                    state TEXT,
+                    question TEXT,
+                    options TEXT,
+                    levels TEXT,
+                    statement TEXT,
+                    temperature REAL,
+                    choice TEXT,
+                    score TEXT,
+                    probability REAL,
+                    probabilities TEXT,
+                    confidence REAL,
+                    source TEXT,
+                    tier TEXT,
+                    escalations TEXT,
+                    cost REAL,
+                    label TEXT
+                )
+                    """)
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_prim_label ON logs(primitive, label)")
                 conn.commit()
 
@@ -100,12 +144,12 @@ class Recorder:
         )
         with self._lock:
             self.save_entry(entry)
+            self._entries.append(entry)
         return entry
 
     def save_entry(self, entry: LogEntry) -> None:
-        # This replaces the old self.save() which wrote the whole list
         with self._lock:
-            with sqlite3.connect(self.path) as conn:
+            with _db(self.path) as conn:
                 conn.execute("""
                     INSERT INTO logs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, (
@@ -178,6 +222,7 @@ class Recorder:
         statement: str,
         result: NoulResult,
         *,
+        question: str | None = None,
         temperature: float = 1.0,
         tier: str | None = None,
         escalations: list[str] | None = None,
@@ -198,44 +243,98 @@ class Recorder:
 
     def label(self, entry_id: str, label: str) -> None:
         with self._lock:
-            with sqlite3.connect(self.path) as conn:
+            with _db(self.path) as conn:
                 cur = conn.execute("UPDATE logs SET label = ? WHERE id = ?", (label, entry_id))
                 if cur.rowcount == 0:
                     raise KeyError(f"no entry with id {entry_id}")
                 conn.commit()
+            for entry in self._entries:
+                if entry.id == entry_id:
+                    entry.label = label
 
     def labeled(self) -> list[LogEntry]:
         with self._lock:
-            with sqlite3.connect(self.path) as conn:
+            with _db(self.path) as conn:
                 cur = conn.execute("SELECT * FROM logs WHERE label IS NOT NULL")
                 return [self._row_to_entry(row) for row in cur.fetchall()]
 
+    def _import_legacy_logs(self) -> None:
+        entries: list[dict[str, Any]] = []
+        try:
+            with open(self.path, encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(obj, dict):
+                        entries.append(obj)
+        except OSError:
+            entries = []
+        if not entries:
+            os.replace(self.path, self.path + ".invalid")
+            return
+        backup = f"{self.path}.legacy"
+        if os.path.exists(backup):
+            os.remove(backup)
+        os.replace(self.path, backup)
+        self._create_schema()
+        for obj in entries:
+            entry = LogEntry(
+                id=obj.get("id") or obj.get("log_id") or uuid.uuid4().hex[:8],
+                ts=obj.get("ts") or _now(),
+                primitive=obj.get("primitive") or obj.get("prim") or "choice",
+                state=obj.get("state"),
+                question=obj.get("question"),
+                options=obj.get("options") if isinstance(obj.get("options"), list) else json.loads(obj["options"]) if obj.get("options") else None,
+                levels=obj.get("levels") if isinstance(obj.get("levels"), list) else json.loads(obj["levels"]) if obj.get("levels") else None,
+                statement=obj.get("statement") or obj.get("text"),
+                temperature=obj.get("temperature") or 1.0,
+                choice=obj.get("choice"),
+                score=str(obj["score"]) if obj.get("score") is not None else None,
+                probability=obj.get("probability") or obj.get("prob"),
+                probabilities=obj.get("probabilities") if isinstance(obj.get("probabilities"), dict) else None,
+                confidence=obj.get("confidence"),
+                source=obj.get("source") or obj.get("model") or "unknown",
+                tier=obj.get("tier"),
+                escalations=list(obj.get("escalations") or []),
+                cost=obj.get("cost"),
+                label=obj.get("label"),
+            )
+            self.save_entry(entry)
+
     def _row_to_entry(self, row: tuple) -> LogEntry:
+        import json as _json
+
         return LogEntry(
-            id=row[0], ts=row[1], primitive=row[2], state=json.loads(row[3]),
-            question=row[4], options=json.loads(row[5]) if row[5] else None,
-            levels=json.loads(row[6]) if row[6] else None, statement=row[7],
+            id=row[0], ts=row[1], primitive=row[2], state=_json.loads(row[3]),
+            question=row[4], options=_json.loads(row[5]) if row[5] else None,
+            levels=_json.loads(row[6]) if row[6] else None, statement=row[7],
             temperature=row[8], choice=row[9], score=row[10],
-            probability=row[11], probabilities=json.loads(row[12]) if row[12] else None,
+            probability=row[11], probabilities=_json.loads(row[12]) if row[12] else None,
             confidence=row[13], source=row[14], tier=row[15],
-            escalations=json.loads(row[16]) if row[16] else [],
-            cost=row[17], label=row[18]
+            escalations=_json.loads(row[16]) if row[16] else [],
+            cost=row[17], label=row[18],
         )
 
-    def save(self) -> None:
-        pass
-
     def load(self) -> None:
-        pass
+        with self._lock:
+            with _db(self.path) as conn:
+                cur = conn.execute("SELECT * FROM logs")
+                self._entries = [self._row_to_entry(row) for row in cur.fetchall()]
 
     def reset(self, *, keep_file: bool = False) -> None:
         with self._lock:
+            self._entries = []
             if not keep_file:
                 try:
                     os.remove(self.path)
-                    self._init_db()
+                    self._create_schema()
                 except FileNotFoundError:
-                    pass
+                    self._create_schema()
 
     def monitor_drift(self, primitive: str, window_size: int = 100) -> bool:
         with self._lock:
@@ -246,7 +345,7 @@ class Recorder:
             recent = entries[-window_size:]
             baseline = entries[:window_size]
 
-            def get_conf(e):
+            def get_conf(e: LogEntry) -> float:
                 return e.confidence if e.confidence is not None else 0.0
 
             mean_recent = sum(get_conf(e) for e in recent) / window_size
@@ -261,7 +360,7 @@ class Recorder:
             if not unlabeled:
                 return []
 
-            def score_uncertainty(e):
+            def score_uncertainty(e: LogEntry) -> float:
                 if primitive == "noul":
                     return abs((e.probability or 0.5) - 0.5)
                 if e.probabilities:
@@ -333,9 +432,10 @@ class Recorder:
 def _argmax_label(probs: dict[str, float]) -> str:
     return max(probs, key=lambda k: probs[k])
 
+
 def get_model_accuracy(recorder: Recorder, model_name: str, primitive: str | None = None) -> float:
     with recorder._lock:
-        with sqlite3.connect(recorder.path) as conn:
+        with _db(recorder.path) as conn:
             query = "SELECT label, choice, score, probability FROM logs WHERE source = ? AND label IS NOT NULL"
             params = [model_name]
             if primitive:
@@ -349,11 +449,12 @@ def get_model_accuracy(recorder: Recorder, model_name: str, primitive: str | Non
             correct = 0
             for row in rows:
                 label, choice, score, prob = row
-                pred = choice or score or (str(prob == 1.0) if prob is not None else None)
+                pred = choice or score or str(prob == 1.0)
                 if str(pred) == str(label):
                     correct += 1
 
             return correct / len(rows)
+
 
 class WeightTuner:
     def __init__(self, recorder: Recorder):

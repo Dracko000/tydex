@@ -146,17 +146,17 @@ class Tydex:
         self._cache: dict[tuple, tuple[float, Any]] = {}
 
     def _get_cache_key(self, method: str, *args, **kwargs) -> tuple:
-        # Simple cache key based on arguments
-        return (method, args, frozenset(kwargs.items()))
+        key_parts = (json.dumps(args, sort_keys=True, default=str), json.dumps(kwargs, sort_keys=True, default=str))
+        return (method, *key_parts)
 
-    async def _with_cache(self, method: str, coro, *args, **kwargs):
+    async def _with_cache(self, method: str, coro_factory, *args, **kwargs):
         key = self._get_cache_key(method, *args, **kwargs)
         if key in self._cache:
             ts, result = self._cache[key]
             if time.time() - ts < self.cache_ttl:
                 return result
 
-        result = await coro
+        result = await coro_factory()
         self._cache[key] = (time.time(), result)
         return result
 
@@ -212,7 +212,7 @@ class Tydex:
             text, _ = await _gather(self.backend, "You are a decision engine. Return valid JSON only.", user, self.model, json_mode=True, max_tokens=500 if reasoning else 200)
             return self._self_choice_result(text, options)
 
-        return await self._with_cache("choice", _do_choice(), state, options, question=question, mode=mode, temperature=temperature, reasoning=reasoning)
+        return await self._with_cache("choice", _do_choice, state, options, question=question, mode=mode, temperature=temperature, reasoning=reasoning)
 
     def _self_choice_result(self, text: str, options: list[str]) -> ChoiceResult:
         try:
@@ -287,7 +287,7 @@ class Tydex:
             probability = min(1.0, max(0.0, probability))
             return NoulResult(probability=probability, confidence=max(probability, 1.0 - probability), source="self")
 
-        return await self._with_cache("noul", _do_noul(), state, statement, mode=mode, temperature=temperature, reasoning=reasoning)
+        return await self._with_cache("noul", _do_noul, state, statement, mode=mode, temperature=temperature, reasoning=reasoning)
 
 
 class EnsembleTydex:

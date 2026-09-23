@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import logo from "@images/logo.svg";
 import { GithubIcon, LinkedinIcon, MenuIcon, XIcon } from "@/components/icons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LINKS } from "@/lib/data";
@@ -38,7 +39,7 @@ export function Nav() {
       >
         <a href="#top" className="flex items-center gap-2.5 no-underline">
           <Image
-            src="/logo.png"
+            src={logo}
             alt="tydex logo"
             width={28}
             height={28}

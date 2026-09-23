@@ -105,13 +105,13 @@ def tearDownModule():
         srv.close()
 
 
-class TestOpenAICompatible(unittest.TestCase):
+class TestOpenAICompatible(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.httpd = SERVERS[0]
 
-    def test_logprobs_choice(self):
+    async def test_logprobs_choice(self):
         backend = OpenAICompatibleBackend("gpt-test", api_key="sk-123", base_url=OPENAI_URL)
-        result = Tydex(backend, model="gpt-test").choice({}, ["a", "b"])
+        result = await Tydex(backend, model="gpt-test").choice({}, ["a", "b"])
         self.assertEqual(result.choice, "a")
         self.assertEqual(result.source, "logprobs")
         expected = _softmax_lp({"0": -0.1, "1": -0.5})["0"]
@@ -121,23 +121,23 @@ class TestOpenAICompatible(unittest.TestCase):
         self.assertEqual(rec["headers"]["authorization"], "Bearer sk-123")
         self.assertTrue(rec["body"]["logprobs"])
 
-    def test_logprobs_noul(self):
+    async def test_logprobs_noul(self):
         backend = OpenAICompatibleBackend("gpt-test", base_url=OPENAI_URL)
-        result = Tydex(backend, model="gpt-test").noul({}, "some claim")
+        result = await Tydex(backend, model="gpt-test").noul({}, "some claim")
         self.assertGreater(result.probability, 0.5)
         expected = math.exp(-0.1) / (math.exp(-0.1) + math.exp(-0.9))
         self.assertAlmostEqual(result.probability, expected)
 
-    def test_self_path_when_logprobs_off(self):
+    async def test_self_path_when_logprobs_off(self):
         backend = OpenAICompatibleBackend("gpt-test", base_url=OPENAI_URL, supports_logprobs=False)
-        result = Tydex(backend, model="gpt-test").choice({}, ["a", "b"])
+        result = await Tydex(backend, model="gpt-test").choice({}, ["a", "b"])
         self.assertEqual(result.choice, "b")
         self.assertEqual(result.confidence, 0.88)
         self.assertEqual(result.source, "self")
 
-    def test_self_noul(self):
+    async def test_self_noul(self):
         backend = OpenAICompatibleBackend("gpt-test", base_url=OPENAI_URL, supports_logprobs=False)
-        result = Tydex(backend, model="gpt-test").noul({}, "STATEMENT here")
+        result = await Tydex(backend, model="gpt-test").noul({}, "STATEMENT here")
         self.assertAlmostEqual(result.probability, 0.72)
 
     def test_openai_backend_subclass(self):
@@ -147,14 +147,14 @@ class TestOpenAICompatible(unittest.TestCase):
         self.assertEqual(backend.model, "local")
 
 
-class TestAnthropicCompatible(unittest.TestCase):
+class TestAnthropicCompatible(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.httpd = SERVERS[1]
 
-    def test_request_shape(self):
+    async def test_request_shape(self):
         backend = AnthropicCompatibleBackend("claude-test", api_key="sk-ant-key", base_url=ANTHROPIC_URL)
         backend.supports_logprobs = False
-        result = Tydex(backend, model="claude-test").choice({}, ["a", "b"])
+        result = await Tydex(backend, model="claude-test").choice({}, ["a", "b"])
         self.assertEqual(result.choice, "a")
         self.assertEqual(result.confidence, 0.85)
         self.assertEqual(result.source, "self")
@@ -168,22 +168,22 @@ class TestAnthropicCompatible(unittest.TestCase):
         self.assertNotIn("logprobs", rec["body"])
         self.assertTrue(rec["body"]["messages"][-1]["content"].startswith("STATE:"))
 
-    def test_system_is_split_out(self):
+    async def test_system_is_split_out(self):
         backend = AnthropicCompatibleBackend("claude-test", api_key="k", base_url=ANTHROPIC_URL)
-        Tydex(backend, model="claude-test").noul({}, "STATEMENT thing")
+        await Tydex(backend, model="claude-test").noul({}, "STATEMENT thing")
         rec = self.httpd.records[-1]
         self.assertTrue(any(m["role"] != "system" for m in rec["body"]["messages"]))
         self.assertIn("You are a decision engine", rec["body"]["system"])
 
-    def test_no_api_key_header_when_missing(self):
+    async def test_no_api_key_header_when_missing(self):
         backend = AnthropicCompatibleBackend("claude-test", base_url=ANTHROPIC_URL)
-        Tydex(backend, model="claude-test").noul({}, "x", mode="self")
+        await Tydex(backend, model="claude-test").noul({}, "x", mode="self")
         rec = self.httpd.records[-1]
         self.assertNotIn("x-api-key", rec["headers"])
 
-    def test_noul_self(self):
+    async def test_noul_self(self):
         backend = AnthropicCompatibleBackend("claude-test", base_url=ANTHROPIC_URL)
-        result = Tydex(backend, model="claude-test").noul({}, "STATEMENT claim")
+        result = await Tydex(backend, model="claude-test").noul({}, "STATEMENT claim")
         self.assertAlmostEqual(result.probability, 0.72)
 
 

@@ -84,7 +84,7 @@ def tune_temperature(
     return CalibrationResult(temperature=best_t, metrics=_metrics(scaled, correct), baseline=baseline)
 
 
-def calibrate_temperature(
+async def calibrate_temperature(
     tdex: Tydex,
     samples: Sequence[tuple[object, Sequence[str], str, str]],
     *,
@@ -93,7 +93,7 @@ def calibrate_temperature(
     probabilities: list[dict[str, float]] = []
     correct: list[str] = []
     for state, options, question, label in samples:
-        result = tdex.choice(state, options, question=question)
+        result = await tdex.choice(state, options, question=question)
         probabilities.append(result.probabilities)
         correct.append(label)
     return tune_temperature(probabilities, correct, temperature_grid=temperature_grid)

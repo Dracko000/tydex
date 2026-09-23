@@ -229,11 +229,11 @@ class CalibratedTydex:
             return ChoiceResult(choice=chosen, probabilities=probs, confidence=confidence, source=source)
         return ScoreResult(score=chosen, probabilities=probs, confidence=confidence, source=source)
 
-    def choice(self, state, options, *, question="Choose the best option.", temperature=1.0, **kwargs):
-        return self._apply("choice", self.tdex.choice(state, options, question=question, temperature=temperature))
+    async def choice(self, state, options, *, question="Choose the best option.", temperature=1.0, **kwargs):
+        return self._apply("choice", await self.tdex.choice(state, options, question=question, temperature=temperature))
 
-    def score(self, state, levels, *, question="Rate the state against the levels.", temperature=1.0, **kwargs):
-        return self._apply("score", self.tdex.score(state, levels, question=question, temperature=temperature))
+    async def score(self, state, levels, *, question="Rate the state against the levels.", temperature=1.0, **kwargs):
+        return self._apply("score", await self.tdex.score(state, levels, question=question, temperature=temperature))
 
-    def noul(self, state, statement, *, temperature=1.0, **kwargs):
-        return self._apply("noul", self.tdex.noul(state, statement, temperature=temperature))
+    async def noul(self, state, statement, *, temperature=1.0, **kwargs):
+        return self._apply("noul", await self.tdex.noul(state, statement, temperature=temperature))

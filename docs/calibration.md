@@ -23,7 +23,7 @@ from tydex import CalibrationSystem, Recorder
 system = CalibrationSystem(Recorder("tydex-feedback.jsonl"), min_samples=8).fit()
 calibrated = system.apply_to(tdex)
 
-r = calibrated.choice({"x": 1}, ["a", "b"])     # source becomes "logprobs+cal"
+r = await calibrated.choice({"x": 1}, ["a", "b"])     # source becomes "logprobs+cal"
 ```
 
 Results persist via `system.save("tydex-calibration.json")` / `system.load(...)`.
@@ -42,7 +42,7 @@ routed = RoutedTydex([
     Tier(Tydex(MockBackend({"0": 0.92, "1": 0.08}), model="gpt-4o"), threshold=None, label="frontier", cost=1.0),
 ])
 
-rr = routed.choice({"q": 1}, ["a", "b"])
+rr = await routed.choice({"q": 1}, ["a", "b"])
 print(rr.tier, rr.escalations, rr.total_cost)   # e.g. "frontier" ["local-llama"] 1.1
 ```
 
@@ -58,7 +58,7 @@ from tydex import AutoCalibrator, Recorder
 auto = AutoCalibrator(Recorder(), refit_every=20, min_samples=8)
 calibrated = auto.apply_to(tdex)
 
-entry = auto.recorder.choice({"x": 1}, ["a", "b"], tdex.choice({"x": 1}, ["a", "b"]))
+entry = auto.recorder.choice({"x": 1}, ["a", "b"], await tdex.choice({"x": 1}, ["a", "b"]))
 auto.label(entry.id, "a")          # logs the ground truth
 auto.maybe_refit()                 # refits when refit_every pending samples accumulate
 print(auto.status())               # pending, temperatures, history, labeled_total

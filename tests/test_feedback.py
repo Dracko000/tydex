@@ -39,7 +39,8 @@ class TestRecorderRoundTrip(unittest.TestCase):
         rec.choice({"x": 1}, ["a", "b"], ChoiceResult("a", {"a": 0.5, "b": 0.5}, 0.5, "m"))
         rec.reset()
         self.assertEqual(len(rec._entries), 0)
-        self.assertFalse(os.path.exists(self.path))
+        other = Recorder(self.path)
+        self.assertEqual(other.labeled(), [])
 
     def test_report_fields(self):
         rec = Recorder(self.path)

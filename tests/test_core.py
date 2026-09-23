@@ -10,7 +10,7 @@ class FakeJsonBackend:
     def __init__(self, text):
         self._text = text
 
-    def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False):
+    async def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False):
         return type("R", (), {"text": self._text, "logprobs": None})()
 
 
@@ -43,60 +43,60 @@ class TestRescale(unittest.TestCase):
             _rescale({"a": 0.5, "b": 0.5}, 0.0)
 
 
-class TestChoiceLogprobs(unittest.TestCase):
-    def test_normalization_and_full_mapping(self):
+class TestChoiceLogprobs(unittest.IsolatedAsyncioTestCase):
+    async def test_normalization_and_full_mapping(self):
         backend = MockBackend({"0": 0.6, "1": 0.3, "2": 0.1, "Yes": 0.7, "No": 0.3})
-        result = Tydex(backend).choice({}, ["a", "b", "c", "d"])
+        result = await Tydex(backend).choice({}, ["a", "b", "c", "d"])
         self.assertEqual(result.choice, "a")
         self.assertAlmostEqual(sum(result.probabilities.values()), 1.0)
         self.assertEqual(result.probabilities["d"], 0.0)
         self.assertEqual(result.source, "logprobs")
 
-    def test_temperature_parameter(self):
+    async def test_temperature_parameter(self):
         backend = MockBackend({"0": 0.6, "1": 0.4})
-        hot = Tydex(backend).choice({}, ["a", "b"], temperature=5.0)
-        flat = Tydex(backend).choice({}, ["a", "b"], temperature=0.5)
+        hot = await Tydex(backend).choice({}, ["a", "b"], temperature=5.0)
+        flat = await Tydex(backend).choice({}, ["a", "b"], temperature=0.5)
         self.assertLess(hot.confidence, flat.confidence)
 
-    def test_requires_two_options(self):
+    async def test_requires_two_options(self):
         with self.assertRaises(ValueError):
-            Tydex(MockBackend()).choice({}, ["only"])
+            await Tydex(MockBackend()).choice({}, ["only"])
 
 
-class TestNoulLogprobs(unittest.TestCase):
-    def test_yes_no(self):
+class TestNoulLogprobs(unittest.IsolatedAsyncioTestCase):
+    async def test_yes_no(self):
         backend = MockBackend({"Yes": 0.7, "No": 0.3})
-        result = Tydex(backend).noul({}, "some statement")
+        result = await Tydex(backend).noul({}, "some statement")
         self.assertAlmostEqual(result.probability, 0.7)
         self.assertTrue(result.bool_value)
 
-    def test_temperature_flattens(self):
+    async def test_temperature_flattens(self):
         backend = MockBackend({"Yes": 0.95, "No": 0.05})
-        r = Tydex(backend).noul({}, "s", temperature=4.0)
+        r = await Tydex(backend).noul({}, "s", temperature=4.0)
         self.assertLess(r.probability, 0.95)
 
 
-class TestChoiceSelf(unittest.TestCase):
-    def test_fenced_json_outside_schema_rejected(self):
+class TestChoiceSelf(unittest.IsolatedAsyncioTestCase):
+    async def test_fenced_json_outside_schema_rejected(self):
         backend = FakeJsonBackend('```json\n{"choice": "bogus", "probability": 0.9}\n```')
         with self.assertRaises(SchemaError):
-            Tydex(backend).choice({}, ["a", "b"], mode="self")
+            await Tydex(backend).choice({}, ["a", "b"], mode="self")
 
-    def test_valid_choice_residual_spread(self):
+    async def test_valid_choice_residual_spread(self):
         backend = FakeJsonBackend('{"choice": "b", "probability": 0.82}')
-        result = Tydex(backend).choice({}, ["a", "b", "c"], mode="self")
+        result = await Tydex(backend).choice({}, ["a", "b", "c"], mode="self")
         self.assertEqual(result.choice, "b")
         self.assertAlmostEqual(sum(result.probabilities.values()), 1.0)
         self.assertAlmostEqual(result.probabilities["a"], result.probabilities["c"])
 
-    def test_probability_clamped(self):
+    async def test_probability_clamped(self):
         backend = FakeJsonBackend('{"choice": "a", "probability": 3.0}')
-        result = Tydex(backend).choice({}, ["a", "b"], mode="self")
+        result = await Tydex(backend).choice({}, ["a", "b"], mode="self")
         self.assertEqual(result.confidence, 1.0)
 
-    def test_noul_self_clamps(self):
+    async def test_noul_self_clamps(self):
         backend = FakeJsonBackend('{"probability": -2.0}')
-        result = Tydex(backend).noul({}, "s", mode="self")
+        result = await Tydex(backend).noul({}, "s", mode="self")
         self.assertEqual(result.probability, 0.0)
 
 

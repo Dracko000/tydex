@@ -15,7 +15,7 @@ def seed_recorder(rec, n=12, p=0.8):
         rec.label(e.id, "false")
 
 
-class TestCalibrationSystem(unittest.TestCase):
+class TestCalibrationSystem(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         self.rec = Recorder(os.path.join(self.dir, "fb.jsonl"))
@@ -41,10 +41,10 @@ class TestCalibrationSystem(unittest.TestCase):
         self.assertEqual(set(loaded.temperatures), set(system.temperatures))
         self.assertAlmostEqual(loaded.transform("noul", {"true": 0.8, "false": 0.2})["true"], system.transform("noul", {"true": 0.8, "false": 0.2})["true"])
 
-    def test_apply_to_wraps_choice(self):
+    async def test_apply_to_wraps_choice(self):
         system = CalibrationSystem(self.rec, min_samples=4).fit()
         tdex = system.apply_to(Tydex(MockBackend(), model="mock"))
-        result = tdex.choice({}, ["a", "b"])
+        result = await tdex.choice({}, ["a", "b"])
         self.assertIsInstance(result, ChoiceResult)
         self.assertIn("+cal", result.source)
 

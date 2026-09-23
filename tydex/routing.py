@@ -58,7 +58,7 @@ class RoutedTydex:
         self.tiers = list(tiers)
         self.on_escalation = on_escalation
 
-    def _route(self, primitive: Primitive, request: dict, min_confidence: float | None) -> RoutedResult:
+    async def _route(self, primitive: Primitive, request: dict, min_confidence: float | None) -> RoutedResult:
         escalations: list[str] = []
         total_cost = 0.0
         last: tuple[PrimitiveResult, str] | None = None
@@ -66,7 +66,7 @@ class RoutedTydex:
             if tier.action == "human":
                 raise RequiresHuman(request=request, escalations=escalations, tier=tier.label or "human")
             assert tier.tdex is not None
-            result = self._call(tier.tdex, primitive, request)
+            result = await self._call(tier.tdex, primitive, request)
             tier_label = tier.label or "model"
             total_cost += tier.cost
             last = (result, tier_label)
@@ -81,32 +81,32 @@ class RoutedTydex:
             return RoutedResult(result=result, escalations=escalations, tier=tier_label, total_cost=total_cost)
         raise RuntimeError("no tier produced a result")
 
-    def _call(self, tdex: Tydex, primitive: Primitive, request: dict) -> PrimitiveResult:
+    async def _call(self, tdex: Tydex, primitive: Primitive, request: dict) -> PrimitiveResult:
         if primitive == "choice":
-            return tdex.choice(
+            return await tdex.choice(
                 state=request["state"],
                 options=request["options"],
                 question=request.get("question", "Choose the best option."),
                 temperature=request.get("temperature", 1.0),
             )
         if primitive == "score":
-            return tdex.score(
+            return await tdex.score(
                 state=request["state"],
                 levels=request["levels"],
                 question=request.get("question", "Rate the state against the levels."),
                 temperature=request.get("temperature", 1.0),
             )
-        return tdex.noul(
+        return await tdex.noul(
             state=request["state"],
             statement=request["statement"],
             temperature=request.get("temperature", 1.0),
         )
 
-    def choice(self, state: object, options: Sequence[str], *, question: str = "Choose the best option.", min_confidence: float | None = None, temperature: float = 1.0) -> RoutedResult:
-        return self._route("choice", {"state": state, "options": list(options), "question": question, "temperature": temperature}, min_confidence)
+    async def choice(self, state: object, options: Sequence[str], *, question: str = "Choose the best option.", min_confidence: float | None = None, temperature: float = 1.0) -> RoutedResult:
+        return await self._route("choice", {"state": state, "options": list(options), "question": question, "temperature": temperature}, min_confidence)
 
-    def score(self, state: object, levels: Sequence[str], *, question: str = "Rate the state against the levels.", min_confidence: float | None = None, temperature: float = 1.0) -> RoutedResult:
-        return self._route("score", {"state": state, "levels": list(levels), "question": question, "temperature": temperature}, min_confidence)
+    async def score(self, state: object, levels: Sequence[str], *, question: str = "Rate the state against the levels.", min_confidence: float | None = None, temperature: float = 1.0) -> RoutedResult:
+        return await self._route("score", {"state": state, "levels": list(levels), "question": question, "temperature": temperature}, min_confidence)
 
-    def noul(self, state: object, statement: str, *, min_confidence: float | None = None, temperature: float = 1.0) -> RoutedResult:
-        return self._route("noul", {"state": state, "statement": statement, "temperature": temperature}, min_confidence)
+    async def noul(self, state: object, statement: str, *, min_confidence: float | None = None, temperature: float = 1.0) -> RoutedResult:
+        return await self._route("noul", {"state": state, "statement": statement, "temperature": temperature}, min_confidence)

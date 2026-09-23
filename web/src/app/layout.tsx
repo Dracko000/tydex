@@ -31,18 +31,18 @@ export const metadata: Metadata = {
     title: "tydex — decisions as data, not prose",
     description:
       "Choice, score, noul — returned as JSON with calibrated probabilities and confidence. Python API + async HTTP server.",
-    images: [{ url: "/logo.png", width: 1000, height: 1000, alt: "tydex logo" }],
+    images: [{ url: "/logo.svg", width: 1000, height: 1000, alt: "tydex logo" }],
   },
   twitter: {
     card: "summary",
     title: "tydex",
     description: "Typed decision primitives for LLMs — calibrated probabilities, not prose.",
-    images: ["/logo.png"],
+    images: ["/logo.svg"],
   },
   icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/logo.png",
+    icon: "/logo.svg",
+    shortcut: "/logo.svg",
+    apple: "/logo.svg",
   },
 };
 

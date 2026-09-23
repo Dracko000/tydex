@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -51,28 +52,7 @@ def main() -> None:
     probs_by: dict[str, list[dict[str, float]]] = {p: [] for p in ("choice", "score", "noul")}
     labels_by: dict[str, list[str]] = {p: [] for p in ("choice", "score", "noul")}
 
-    for sample in samples:
-        primitive = sample["primitive"]
-        state = sample["state"]
-        answer = sample["answer"]
-        if primitive == "choice":
-            result = tdex.choice(state, sample["options"], question=sample.get("question"))
-            entry = recorder.choice(state, sample["options"], result, question=sample.get("question"))
-            probs_by["choice"].append(result.probabilities)
-            labels_by["choice"].append(answer)
-        elif primitive == "score":
-            result = tdex.score(state, sample["levels"], question=sample.get("question"))
-            entry = recorder.score(state, sample["levels"], result, question=sample.get("question"))
-            probs_by["score"].append(result.probabilities)
-            labels_by["score"].append(answer)
-        else:
-            result = tdex.noul(state, sample["statement"])
-            entry = recorder.noul(state, sample["statement"], result)
-            probs_by["noul"].append({"true": result.probability, "false": 1.0 - result.probability})
-            labels_by["noul"].append("true" if answer else "false")
-        recorder.label(entry.id, str(answer))
-        print(f"[{primitive:6}] pred={entry.predicted!r} conf={entry.confidence:.2f} label={answer}  {'OK' if entry.correct else 'MISS'}")
-
+    asyncio.run(_run(tdex, recorder, samples, probs_by, labels_by))
     for primitive in ("choice", "score", "noul"):
         if not probs_by[primitive]:
             continue
@@ -81,6 +61,36 @@ def main() -> None:
         print(f"\n[{primitive}] n={len(probs_by[primitive])}  acc={acc:.2f}")
         print(f"    ECE before={tuned.baseline.ece:.3f} (mean conf {tuned.baseline.mean_confidence:.2f})")
         print(f"    best T={tuned.temperature:.1f}  ECE after={tuned.metrics.ece:.3f}")
+
+
+async def _run(
+    tdex: Tydex,
+    recorder: Recorder,
+    samples: list[dict],
+    probs_by: dict[str, list[dict[str, float]]],
+    labels_by: dict[str, list[str]],
+) -> None:
+    for sample in samples:
+        primitive = sample["primitive"]
+        state = sample["state"]
+        answer = sample["answer"]
+        if primitive == "choice":
+            result = await tdex.choice(state, sample["options"], question=sample.get("question"))
+            entry = recorder.choice(state, sample["options"], result, question=sample.get("question"))
+            probs_by["choice"].append(result.probabilities)
+            labels_by["choice"].append(answer)
+        elif primitive == "score":
+            result = await tdex.score(state, sample["levels"], question=sample.get("question"))
+            entry = recorder.score(state, sample["levels"], result, question=sample.get("question"))
+            probs_by["score"].append(result.probabilities)
+            labels_by["score"].append(answer)
+        else:
+            result = await tdex.noul(state, sample["statement"])
+            entry = recorder.noul(state, sample["statement"], result)
+            probs_by["noul"].append({"true": result.probability, "false": 1.0 - result.probability})
+            labels_by["noul"].append("true" if answer else "false")
+        recorder.label(entry.id, str(answer))
+        print(f"[{primitive:6}] pred={entry.predicted!r} conf={entry.confidence:.2f} label={answer}  {'OK' if entry.correct else 'MISS'}")
 
 
 if __name__ == "__main__":

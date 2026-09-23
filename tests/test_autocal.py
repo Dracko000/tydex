@@ -11,11 +11,11 @@ class FakeJsonBackend:
     def __init__(self, text):
         self._text = text
 
-    def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False):
+    async def complete(self, *, messages, temperature=0.0, max_tokens=1, logprobs=False, top_logprobs=0, json_mode=False):
         return type("R", (), {"text": self._text, "logprobs": None})()
 
 
-class TestAutoCalibrator(unittest.TestCase):
+class TestAutoCalibrator(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         self.rec = Recorder(os.path.join(self.dir, "fb.jsonl"))
@@ -37,13 +37,13 @@ class TestAutoCalibrator(unittest.TestCase):
         self.assertTrue(auto.maybe_refit())
         self.assertEqual(auto.pending, 0)
 
-    def test_live_update_after_refit(self):
+    async def test_live_update_after_refit(self):
         auto = AutoCalibrator(self.rec, refit_every=4, config_path=os.path.join(self.dir, "c.json"), min_samples=2)
         cal = auto.apply_to(Tydex(MockBackend(), model="mock"))
-        before = cal.noul({}, "x").confidence
+        before = (await cal.noul({}, "x")).confidence
         self._seed(2, 2)
         auto.maybe_refit()
-        after = cal.noul({}, "x").confidence
+        after = (await cal.noul({}, "x")).confidence
         self.assertNotEqual(before, after)
         self.assertLessEqual(after, 0.95)
 

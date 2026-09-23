@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
+import inspect
 import json
 import os
 import sys
@@ -134,22 +136,22 @@ def _csv(flag: str, raw: str | None) -> list[str]:
     return items
 
 
-def _run(tdex: Tydex, args: argparse.Namespace, state: object):
+async def _run(tdex: Tydex, args: argparse.Namespace, state: object):
     start = time.perf_counter()
     if args.type == "choice":
-        res_c = tdex.choice(state, _csv("--options", args.options), question=args.question, mode=args.mode, temperature=args.temperature)
+        res_c = await tdex.choice(state, _csv("--options", args.options), question=args.question, mode=args.mode, temperature=args.temperature)
         return res_c, "choice", res_c.choice, res_c.probabilities, time.perf_counter() - start
     if args.type == "score":
-        res_s = tdex.score(state, _csv("--levels", args.levels), question=args.question, mode=args.mode, temperature=args.temperature)
+        res_s = await tdex.score(state, _csv("--levels", args.levels), question=args.question, mode=args.mode, temperature=args.temperature)
         return res_s, "score", res_s.score, res_s.probabilities, time.perf_counter() - start
     if not args.statement:
         raise CliError("missing required argument: --statement")
-    res_n = tdex.noul(state, args.statement, mode=args.mode, temperature=args.temperature)
+    res_n = await tdex.noul(state, args.statement, mode=args.mode, temperature=args.temperature)
     probs = {"true": res_n.probability, "false": round(1.0 - res_n.probability, 6)}
     return res_n, "probability", res_n.bool_value, probs, time.perf_counter() - start
 
 
-def cmd_ask(args: argparse.Namespace) -> int:
+async def cmd_ask(args: argparse.Namespace) -> int:
     backend = resolve_backend(
         args.provider,
         model=args.model,
@@ -162,7 +164,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
     except json.JSONDecodeError as exc:
         raise CliError(f"invalid --state JSON: {exc}") from exc
     tdex = Tydex(backend, model=getattr(backend, "model", args.model or "default"))
-    result, key, value, probs, elapsed = _run(tdex, args, state)
+    result, key, value, probs, elapsed = await _run(tdex, args, state)
 
     if args.json:
         payload = {
@@ -220,7 +222,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        return args.func(args)
+        func = args.func
+        if inspect.iscoroutinefunction(func):
+            return asyncio.run(func(args))
+        return func(args)
     except (CliError, SchemaError, OSError, URLError, KeyboardInterrupt) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

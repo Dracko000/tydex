@@ -25,24 +25,28 @@ A decision workflow built on chat completions has to parse free text and guess h
 pip install tydex
 ```
 
-Python `>= 3.10`. No third-party runtime dependencies (HTTP backends use stdlib `urllib`).
+Python `>= 3.10`. The only runtime dependency is `httpx` (async HTTP transports); the HTTP server needs the optional `server` extra (`fastapi` + `uvicorn`).
 
 ## Quick start
 
 ```python
+import asyncio
 from tydex import Tydex, MockBackend
 
-tdex = Tydex(MockBackend(), model="mock")
+async def main():
+    tdex = Tydex(MockBackend(), model="mock")
 
-r = tdex.choice(
-    {"topic": "refund"},
-    ["refund", "replace", "no_action"],
-    question="How should we resolve this ticket?",
-)
-print(r.choice)              # "refund"
-print(r.probabilities)       # {"refund": 0.6, "replace": 0.3, "no_action": 0.1}
-print(r.confidence)          # 0.6
-print(r.source)              # "logprobs"
+    r = await tdex.choice(
+        {"topic": "refund"},
+        ["refund", "replace", "no_action"],
+        question="How should we resolve this ticket?",
+    )
+    print(r.choice)              # "refund"
+    print(r.probabilities)       # {"refund": 0.6, "replace": 0.3, "no_action": 0.1}
+    print(r.confidence)          # 0.6
+    print(r.source)              # "logprobs"
+
+asyncio.run(main())
 ```
 
 ## The three primitives
@@ -54,7 +58,7 @@ print(r.source)              # "logprobs"
 | `noul` | probability of a statement being true + `bool_value` | yes/no gates, claim validation |
 
 ```python
-n = tdex.noul({"priority": "P0"}, "This incident violates the SLA.")
+n = await tdex.noul({"priority": "P0"}, "This incident violates the SLA.")
 print(n.probability)   # 0.9
 print(n.bool_value)    # True
 ```
@@ -67,6 +71,6 @@ Two ways to obtain probabilities; chosen automatically via `mode="auto"`:
 - **`self`** — ask the model for JSON (`{"choice": ..., "probability": ...}`) and parse it. Works with every backend, including APIs that expose no logprobs.
 
 ```python
-tdex.choice(state, options, mode="self")          # force JSON estimate
-tdex.choice(state, options, temperature=2.0)      # sharpen/soften via p^(1/T)
+await tdex.choice(state, options, mode="self")          # force JSON estimate
+await tdex.choice(state, options, temperature=2.0)      # sharpen/soften via p^(1/T)
 ```

@@ -74,24 +74,28 @@ noul    ██████████  100%  (probability + bool_value)
 pip install tydex
 ```
 
-From a source checkout: `pip install .`. Python `>= 3.10`. No third-party runtime dependencies (HTTP backends use stdlib `urllib`).
+From a source checkout: `pip install .`. Python `>= 3.10`. The only runtime dependency is `httpx` (async HTTP transports); the HTTP server needs the optional `server` extra (`fastapi` + `uvicorn`).
 
 ## Quick start
 
 ```python
+import asyncio
 from tydex import Tydex, MockBackend
 
-tdex = Tydex(MockBackend(), model="mock")
+async def main():
+    tdex = Tydex(MockBackend(), model="mock")
 
-r = tdex.choice(
-    {"topic": "refund"},
-    ["refund", "replace", "no_action"],
-    question="How should we resolve this ticket?",
-)
-print(r.choice)              # "refund"
-print(r.probabilities)       # {"refund": 0.6, "replace": 0.3, "no_action": 0.1}
-print(r.confidence)          # 0.6
-print(r.source)              # "logprobs"
+    r = await tdex.choice(
+        {"topic": "refund"},
+        ["refund", "replace", "no_action"],
+        question="How should we resolve this ticket?",
+    )
+    print(r.choice)              # "refund"
+    print(r.probabilities)       # {"refund": 0.6, "replace": 0.3, "no_action": 0.1}
+    print(r.confidence)          # 0.6
+    print(r.source)              # "logprobs"
+
+asyncio.run(main())
 ```
 
 ### The three primitives
@@ -103,7 +107,7 @@ print(r.source)              # "logprobs"
 | `noul` | probability of a statement being true + `bool_value` | yes/no gates, claim validation |
 
 ```python
-n = tdex.noul({"priority": "P0"}, "This incident violates the SLA.")
+n = await tdex.noul({"priority": "P0"}, "This incident violates the SLA.")
 print(n.probability)   # 0.9
 print(n.bool_value)    # True
 ```
@@ -116,8 +120,8 @@ Two ways to obtain probabilities; chosen automatically via `mode="auto"`:
 - **`self`** — ask the model for JSON (`{"choice": ..., "probability": ...}`) and parse it. Works with every backend, including the Ollama cloud API that exposes no logprobs.
 
 ```python
-tdex.choice(state, options, mode="self")          # force JSON estimate
-tdex.choice(state, options, temperature=2.0)      # sharpen/soften via p^(1/T)
+await tdex.choice(state, options, mode="self")          # force JSON estimate
+await tdex.choice(state, options, temperature=2.0)      # sharpen/soften via p^(1/T)
 ```
 
 ## Backends
@@ -148,7 +152,7 @@ tdex = Tydex(
 )
 ```
 
-The OpenAI SDK is **not** required; every backend uses stdlib HTTP.
+The OpenAI SDK is **not** required; every backend is a thin async HTTP client on `httpx` — no vendor SDKs.
 
 ## Calibration
 
@@ -175,7 +179,7 @@ from tydex import CalibrationSystem, Recorder
 system = CalibrationSystem(Recorder("tydex-feedback.jsonl"), min_samples=8).fit()
 calibrated = system.apply_to(tdex)
 
-r = calibrated.choice({"x": 1}, ["a", "b"])     # source becomes "logprobs+cal"
+r = await calibrated.choice({"x": 1}, ["a", "b"])     # source becomes "logprobs+cal"
 ```
 
 Results persist via `system.save("tydex-calibration.json")` / `system.load(...)`.
@@ -194,7 +198,7 @@ routed = RoutedTydex([
     Tier(Tydex(MockBackend({"0": 0.92, "1": 0.08}), model="gpt-4o"), threshold=None, label="frontier", cost=1.0),
 ])
 
-rr = routed.choice({"q": 1}, ["a", "b"])
+rr = await routed.choice({"q": 1}, ["a", "b"])
 print(rr.tier, rr.escalations, rr.total_cost)   # e.g. "frontier" ["local-llama"] 1.1
 ```
 
@@ -210,7 +214,7 @@ from tydex import AutoCalibrator, Recorder
 auto = AutoCalibrator(Recorder(), refit_every=20, min_samples=8)
 calibrated = auto.apply_to(tdex)
 
-entry = auto.recorder.choice({"x": 1}, ["a", "b"], tdex.choice({"x": 1}, ["a", "b"]))
+entry = auto.recorder.choice({"x": 1}, ["a", "b"], await tdex.choice({"x": 1}, ["a", "b"]))
 auto.label(entry.id, "a")          # logs the ground truth
 auto.maybe_refit()                 # refits when refit_every pending samples accumulate
 print(auto.status())               # pending, temperatures, history, labeled_total
