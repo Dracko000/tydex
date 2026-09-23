@@ -7,6 +7,8 @@ import { Counter } from "@/components/counters";
 import { Terminal } from "@/components/terminal";
 import { CodeBlock } from "@/components/code-block";
 import { CalibrationCharts } from "@/components/calibration-charts";
+import { VsJevChat } from "@/components/vs-jev-chat";
+import { VsJevChart } from "@/components/vs-jev-chart";
 import {
   ArrowRightIcon,
   BoltIcon,
@@ -539,10 +541,42 @@ export default function Home() {
         <EndpointText />
       </Section>
 
-      {/* ============ 05 · GET STARTED ============ */}
+      {/* ============ 05 · TYDEX VS JEV ============ */}
+      <Section
+        id="vs-jev"
+        kicker="05 · tydex vs Jev"
+        title="The decision engine that inspired tydex — without the walled garden."
+        lead={
+          <>
+            tydex is an open-source behavioural clone of Jev. Same primitives
+            ({`choice`} / {`score`} / {`noul`}), same escalation model — but the code,
+            the data, and the calibration pipeline stay yours.
+          </>
+        }
+      >
+        <div className="grid items-start gap-10 lg:grid-cols-5">
+          <div className="lg:col-span-3">
+            <VsJevChat />
+          </div>
+          <div className="lg:col-span-2">
+            <Reveal delay={120}>
+              <VsJevChart />
+            </Reveal>
+          </div>
+        </div>
+
+        <Reveal delay={80}>
+          <p className="mt-8 font-mono text-xs text-mut">
+            primitive behaviour parity vs Jev: choice 100% · score 100% · noul 100% — the
+            Jev column describes the behaviour tydex clones when it is not publicly documented.
+          </p>
+        </Reveal>
+      </Section>
+
+      {/* ============ 06 · GET STARTED ============ */}
       <Section
         id="install"
-        kicker="05 · get started"
+        kicker="06 · get started"
         title="Live in five lines."
         lead={
           <>
@@ -707,6 +741,11 @@ export default function Home() {
                 <li>
                   <a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href="#architecture">
                     Architecture
+                  </a>
+                </li>
+                <li>
+                  <a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href="#vs-jev">
+                    vs Jev
                   </a>
                 </li>
                 <li>

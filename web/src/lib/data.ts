@@ -14,6 +14,41 @@ export const BENCHMARKS: Benchmark[] = [
   { id: "noul", name: "noul", before: 0.161, after: 0.158, temp: "1.4", samples: 21, accuracy: 0.71 },
 ];
 
+export type VsJevRow = { q: string; jev: string; tydex: string };
+
+export const VS_JEV: VsJevRow[] = [
+  {
+    q: "Can I run it in my own environment?",
+    jev: "No — hosted as a closed SaaS. Prompts and decisions leave your environment.",
+    tydex: "Yes — pip install, bring your own endpoint. SQLite, models, and calibration stay on your side.",
+  },
+  {
+    q: "Which models can I use?",
+    jev: "A fixed internal vendor set. No bring-your-own model.",
+    tydex: "Any — OpenAI, Anthropic, Ollama, OpenAI-compatible, mock. Swap backends without touching your code.",
+  },
+  {
+    q: "Where do the probabilities come from?",
+    jev: "An internal estimate. Not documented, not auditable.",
+    tydex: "Raw token logprobs, or a calibratable self-estimate — the source is on every result.",
+  },
+  {
+    q: "How do I verify the quality?",
+    jev: "No public test suite or benchmark.",
+    tydex: "91 unit tests, CI + e2e, and an ECE report for every calibration change.",
+  },
+];
+
+export const VS_JEV_SCORES: { cat: string; tydex: number; jev: number }[] = [
+  { cat: "Open source", tydex: 10, jev: 0 },
+  { cat: "Self-hosting / data", tydex: 10, jev: 0 },
+  { cat: "Model choice / no lock-in", tydex: 10, jev: 1 },
+  { cat: "Auditable probabilities", tydex: 9, jev: 1 },
+  { cat: "Calibration transparency", tydex: 9, jev: 1 },
+  { cat: "Public interfaces", tydex: 9, jev: 4 },
+  { cat: "Published verification", tydex: 9, jev: 2 },
+];
+
 export const STATS = [
   { value: 91, suffix: "", label: "unit tests green" },
   { value: 60, suffix: "", label: "labeled tickets in the dataset" },
