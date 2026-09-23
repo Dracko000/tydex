@@ -40,7 +40,7 @@ export function Terminal({
       </div>
       <motion.div
         variants={container}
-        initial={state ?? "hidden"}
+        initial={state ?? false}
         animate={state ?? "show"}
         className="overflow-x-auto p-5 font-mono text-[13px] leading-6"
       >
