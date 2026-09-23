@@ -41,9 +41,9 @@ export function Nav() {
           <Image
             src={logo}
             alt="tydex logo"
-            width={28}
-            height={28}
-            className="h-7 w-7"
+            width={36}
+            height={36}
+            className="h-9 w-9"
           />
           <span className="font-mono text-lg font-semibold tracking-tight text-ink">
             tydex
