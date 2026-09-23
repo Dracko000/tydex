@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GithubIcon, Logo, MenuIcon, XIcon } from "@/components/icons";
+import Image from "next/image";
+import { GithubIcon, LinkedinIcon, MenuIcon, XIcon } from "@/components/icons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LINKS } from "@/lib/data";
 
@@ -33,10 +34,16 @@ export function Nav() {
     >
       <nav
         aria-label="Main"
-        className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6"
+        className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6"
       >
         <a href="#top" className="flex items-center gap-2.5 no-underline">
-          <Logo className="h-6 w-6 text-brand" />
+          <Image
+            src="/logo.png"
+            alt="tydex logo"
+            width={28}
+            height={28}
+            className="h-7 w-7"
+          />
           <span className="font-mono text-lg font-semibold tracking-tight text-ink">
             tydex
           </span>
@@ -72,6 +79,15 @@ export function Nav() {
           >
             <GithubIcon className="h-5 w-5" />
           </a>
+          <a
+            href={LINKS.linkedin}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="AIMB X Labs on LinkedIn"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-surface text-mut transition-colors duration-200 hover:text-brand"
+          >
+            <LinkedinIcon className="h-5 w-5" />
+          </a>
           <ThemeToggle />
         </div>
 
@@ -91,7 +107,7 @@ export function Nav() {
 
       {open ? (
         <div className="border-t border-line bg-bg/95 backdrop-blur-md md:hidden">
-          <div className="mx-auto max-w-6xl space-y-1 px-4 py-3">
+          <div className="mx-auto max-w-7xl space-y-1 px-4 py-3">
             {NAV.map((item) => (
               <a
                 key={item.href}

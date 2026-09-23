@@ -92,7 +92,7 @@ function Section({
       id={id}
       className={`${tone === "raised" ? "border-y border-line bg-surface/40" : ""} py-24 sm:py-28`}
     >
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <Kicker>{kicker}</Kicker>
         <ChapterTitle title={title} />
         {lead ? <Lead>{lead}</Lead> : null}
@@ -157,7 +157,7 @@ export default function Home() {
       {/* ============ HERO ============ */}
       <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-24">
         <div className="grid-faint pointer-events-none absolute inset-0" aria-hidden />
-        <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid items-center gap-14 lg:grid-cols-2">
             <div>
               <Reveal>
@@ -252,7 +252,7 @@ export default function Home() {
 
       {/* ============ STATS STRIP ============ */}
       <section className="border-y border-line">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-8 gap-y-10 px-4 py-12 sm:px-6 lg:grid-cols-4">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-8 gap-y-10 px-4 py-12 sm:px-6 lg:grid-cols-4">
           {STATS.map((s) => (
             <Counter key={s.label} value={s.value} suffix={s.suffix} label={s.label} />
           ))}
@@ -665,7 +665,7 @@ export default function Home() {
 
       {/* ============ CLIMAX CTA ============ */}
       <section className="pb-24 sm:pb-28">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <Reveal>
             <div className="relative border-y border-line">
               <div className="grid-faint pointer-events-none absolute inset-0" aria-hidden />
@@ -711,7 +711,7 @@ export default function Home() {
 
       {/* ============ FOOTER ============ */}
       <footer className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
           <div className="grid gap-10 md:grid-cols-4">
             <div className="md:col-span-2">
               <span className="font-mono text-lg font-semibold text-ink">tydex</span>
@@ -778,6 +778,11 @@ export default function Home() {
                 <li>
                   <a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href={LINKS.changelog} target="_blank" rel="noopener noreferrer">
                     Changelog
+                  </a>
+                </li>
+                <li>
+                  <a className="cursor-pointer text-ink transition-colors duration-200 hover:text-brand" href={LINKS.linkedin} target="_blank" rel="noopener noreferrer">
+                    LinkedIn · AIMB X Labs
                   </a>
                 </li>
               </ul>

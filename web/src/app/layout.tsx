@@ -39,6 +39,11 @@ export const metadata: Metadata = {
     description: "Typed decision primitives for LLMs — calibrated probabilities, not prose.",
     images: ["/logo.png"],
   },
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 const themeScript = `(function(){try{var s=localStorage.getItem("theme");var d=s?(s==="dark"):(matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);}catch(e){}})();`;

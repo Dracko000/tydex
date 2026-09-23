@@ -130,4 +130,5 @@ export const LINKS = {
   ghcr: "https://github.com/Dracko000/tydex/pkgs/container/tydex",
   releases: "https://github.com/Dracko000/tydex/releases",
   changelog: "https://github.com/Dracko000/tydex/blob/main/CHANGELOG.md",
+  linkedin: "https://www.linkedin.com/company/aimb-x-labs",
 };
