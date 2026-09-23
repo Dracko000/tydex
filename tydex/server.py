@@ -3,16 +3,16 @@ from __future__ import annotations
 import argparse
 import hmac
 import json
-import os
-from typing import Any, cast
-
-# ... (existing imports)
-from fastapi import FastAPI, Request, Header, HTTPException, Depends, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 import logging
+import os
 import time
 from collections import defaultdict
+from typing import Any
+
+# ... (existing imports)
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # Configure structured logging
 logging.basicConfig(
@@ -42,7 +42,7 @@ limiter = RateLimiter(requests_per_minute=100)
 # ... (rest of the file)
 
 from .autocal import AutoCalibrator
-from .backends import AnthropicCompatibleBackend, Backend, MockBackend, OllamaBackend, OpenAIBackend
+from .backends import AnthropicCompatibleBackend, MockBackend, OllamaBackend, OpenAIBackend
 from .calibrated import CalibratedTydex, CalibrationSystem
 from .config import load_env
 from .core import SchemaError, Tydex
@@ -139,7 +139,8 @@ class TydexServer:
             res = await self.tdex.choice(state, options, question=q.question or "Choose the best option.", temperature=temp)
             log_id = await self._log("choice", state, {"options": options, "question": q.question}, res)
             body = {"id": qid, "type": "choice", "choice": res.choice, "probabilities": res.probabilities, "confidence": res.confidence}
-            if log_id: body["log_id"] = log_id
+            if log_id:
+                body["log_id"] = log_id
             return body
         if qtype == "score":
             levels = q.levels
@@ -148,7 +149,8 @@ class TydexServer:
             res = await self.tdex.score(state, levels, question=q.question or "Rate the state against the levels.", temperature=temp)
             log_id = await self._log("score", state, {"levels": levels, "question": q.question}, res)
             body = {"id": qid, "type": "score", "score": res.score, "probabilities": res.probabilities, "confidence": res.confidence}
-            if log_id: body["log_id"] = log_id
+            if log_id:
+                body["log_id"] = log_id
             return body
         if qtype == "noul":
             statement = q.statement
@@ -157,7 +159,8 @@ class TydexServer:
             res = await self.tdex.noul(state, statement, temperature=temp)
             log_id = await self._log("noul", state, {"statement": statement}, res)
             body = {"id": qid, "type": "noul", "probability": res.probability, "bool_value": res.bool_value, "confidence": res.confidence}
-            if log_id: body["log_id"] = log_id
+            if log_id:
+                body["log_id"] = log_id
             return body
         raise ValueError(f"unknown question type: {qtype!r}")
 
@@ -195,21 +198,48 @@ class RoutedTydexServer:
                 raise ValueError("choice requires 'options' as a list of >= 2 items")
             rr = await self.routed.choice(state, options, question=q.question or "Choose the best option.", min_confidence=min_conf)
             res = rr.result
-            return {"id": qid, "type": "choice", "choice": res.choice, "probabilities": res.probabilities, "confidence": rr.confidence, "tier": rr.tier, "escalations": rr.escalations, "total_cost": rr.total_cost}
+            return {
+                "id": qid,
+                "type": "choice",
+                "choice": res.choice,
+                "probabilities": res.probabilities,
+                "confidence": rr.confidence,
+                "tier": rr.tier,
+                "escalations": rr.escalations,
+                "total_cost": rr.total_cost,
+            }
         if qtype == "score":
             levels = q.levels
             if not isinstance(levels, list) or len(levels) < 2:
                 raise ValueError("score requires 'levels' as a list of >= 2 items")
             rr = await self.routed.score(state, levels, question=q.question or "Rate the state against the levels.", min_confidence=min_conf)
             res = rr.result
-            return {"id": qid, "type": "score", "score": res.score, "probabilities": res.probabilities, "confidence": rr.confidence, "tier": rr.tier, "escalations": rr.escalations, "total_cost": rr.total_cost}
+            return {
+                "id": qid,
+                "type": "score",
+                "score": res.score,
+                "probabilities": res.probabilities,
+                "confidence": rr.confidence,
+                "tier": rr.tier,
+                "escalations": rr.escalations,
+                "total_cost": rr.total_cost,
+            }
         if qtype == "noul":
             statement = q.statement
             if not isinstance(statement, str) or not statement:
                 raise ValueError("noul requires a non-empty 'statement'")
             rr = await self.routed.noul(state, statement, min_confidence=min_conf)
             res = rr.result
-            return {"id": qid, "type": "noul", "probability": res.probability, "bool_value": res.bool_value, "confidence": rr.confidence, "tier": rr.tier, "escalations": rr.escalations, "total_cost": rr.total_cost}
+            return {
+                "id": qid,
+                "type": "noul",
+                "probability": res.probability,
+                "bool_value": res.bool_value,
+                "confidence": rr.confidence,
+                "tier": rr.tier,
+                "escalations": rr.escalations,
+                "total_cost": rr.total_cost,
+            }
         raise ValueError(f"unknown question type: {qtype!r}")
 
 # --- FastAPI Application ---
@@ -300,7 +330,7 @@ def build_app(
         try:
             server.auto.label(req.log_id, req.label)
         except KeyError:
-            raise HTTPException(status_code=404, detail=f"unknown log_id {req.log_id}")
+            raise HTTPException(status_code=404, detail=f"unknown log_id {req.log_id}") from None
         refitted = server.auto.maybe_refit()
         return {"ok": True, "refitted": refitted, **server.auto.status()}
 

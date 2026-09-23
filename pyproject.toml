@@ -42,3 +42,6 @@ line-length = 200
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tydex/server.py" = ["E402"]

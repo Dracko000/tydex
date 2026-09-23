@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import json
-import math
 import asyncio
-import httpx
+import math
 from dataclasses import dataclass
 from typing import Any, Callable
+
+import httpx
+
 
 @dataclass
 class ModelResponse:
@@ -24,7 +25,7 @@ async def _with_retry(func: Callable, *args, **kwargs):
                 backoff *= 2
                 continue
             raise
-        except (httpx.RequestError, asyncio.TimeoutError) as e:
+        except (httpx.RequestError, asyncio.TimeoutError):
             if i < max_retries - 1:
                 await asyncio.sleep(backoff)
                 backoff *= 2

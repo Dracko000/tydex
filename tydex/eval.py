@@ -5,17 +5,14 @@ import asyncio
 import json
 import os
 import sys
-import math
 from dataclasses import dataclass
-from typing import Any, Sequence
-from collections import defaultdict
 
-from tydex.backends import LocalOpenAIBackend, OpenAIBackend, MockBackend
-from tydex.core import Tydex, ChoiceResult, ScoreResult, NoulResult
-from tydex.calibrated import CalibrationSystem, CalibratedTydex
-from tydex.core import EnsembleTydex, RefiningTydex
+from tydex.backends import LocalOpenAIBackend
+from tydex.calibrated import CalibrationSystem
 from tydex.calibration import tune_temperature
 from tydex.config import env_api_key
+from tydex.core import EnsembleTydex, RefiningTydex, Tydex
+
 
 @dataclass
 class MetricResult:
@@ -83,7 +80,7 @@ class EvaluationFramework:
                 continue
 
             # Accuracy
-            acc = sum(1 for p, l in zip(probs_list, labels_list) if max(p, key=p.get) == l) / len(probs_list)
+            acc = sum(1 for p, label in zip(probs_list, labels_list, strict=False) if max(p, key=p.get) == label) / len(probs_list)
 
             # Calibration (ECE)
             tuned = tune_temperature(probs_list, labels_list)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import asyncio
+import json
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -319,7 +319,7 @@ class EnsembleTydex:
         )
 
         agg_probs: dict[str, float] = {opt: 0.0 for opt in options}
-        for res, w in zip(results, self.weights):
+        for res, w in zip(results, self.weights, strict=False):
             for opt, prob in res.probabilities.items():
                 agg_probs[opt] += prob * w
 
@@ -354,7 +354,7 @@ class EnsembleTydex:
             *[m.noul(state, statement, temperature=temperature) for m in self.members]
         )
 
-        avg_prob = sum(r.probability * w for r, w in zip(results, self.weights))
+        avg_prob = sum(r.probability * w for r, w in zip(results, self.weights, strict=False))
         return NoulResult(
             probability=avg_prob,
             confidence=max(avg_prob, 1.0 - avg_prob),
